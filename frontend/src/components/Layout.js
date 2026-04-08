@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { LayoutDashboard, Package, ShoppingCart, History, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, History, BarChart3, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/productos', icon: Package, label: 'Productos' },
   { to: '/ventas', icon: ShoppingCart, label: 'Ventas' },
   { to: '/historial', icon: History, label: 'Historial' },
+  { to: '/reportes', icon: BarChart3, label: 'Reportes' },
 ];
 
 export default function Layout({ children }) {

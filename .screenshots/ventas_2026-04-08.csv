@@ -1,0 +1,6 @@
+ID,Fecha,Hora,Método Pago,Total (MXN),Cambio,Estado,Productos
+69d68b758de5058b4f405e31,2026-04-08,17:08:05,efectivo,60.0,40.0,anulada,Producto Test 170805 x2.0
+69d68b038de5058b4f405e2c,2026-04-08,17:06:11,efectivo,51.0,49.0,completada,Producto Test 164846 x2.0
+69d6890d20a6cae349971985,2026-04-08,16:57:49,efectivo,60.0,40.0,anulada,Producto Test 165748 x2.0
+69d687666880922c36449ec5,2026-04-08,16:50:46,efectivo,25.5,24.5,anulada,Producto Test 164846 x1.0
+69d686fe6880922c36449ec1,2026-04-08,16:49:02,efectivo,60.0,40.0,anulada,Producto Test 164902 x2.0

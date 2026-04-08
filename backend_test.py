@@ -394,6 +394,174 @@ class InventoryAPITester:
         
         return self.log_test("Unauthorized Access (401)", success, details)
 
+    def test_reports_sales(self) -> bool:
+        """Test sales report endpoint with filters"""
+        # Re-login for reports testing
+        login_success, _ = self.make_request('POST', '/auth/login', self.admin_credentials)
+        if not login_success:
+            return self.log_test("Reports Sales - Login", False, "- Could not login for reports")
+        
+        # Test without filters
+        success, data = self.make_request('GET', '/reports/sales')
+        
+        if success:
+            required_fields = ['sales', 'summary']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                success = False
+                details = f"- Missing fields: {missing_fields}"
+            else:
+                sales_count = len(data.get('sales', []))
+                summary = data.get('summary', {})
+                details = f"- Sales: {sales_count}, Total: {summary.get('total_ventas', 0)}"
+        else:
+            details = f"- {data.get('detail', 'Failed to fetch')}"
+        
+        return self.log_test("Reports Sales", success, details)
+
+    def test_reports_sales_with_filters(self) -> bool:
+        """Test sales report with date and status filters"""
+        from datetime import date
+        today = date.today().strftime('%Y-%m-%d')
+        
+        # Test with date filter
+        success, data = self.make_request('GET', f'/reports/sales?start_date={today}&status=completada')
+        
+        if success:
+            sales = data.get('sales', [])
+            summary = data.get('summary', {})
+            details = f"- Filtered sales: {len(sales)}, Completadas: {summary.get('ventas_completadas', 0)}"
+        else:
+            details = f"- {data.get('detail', 'Failed to fetch with filters')}"
+        
+        return self.log_test("Reports Sales with Filters", success, details)
+
+    def test_reports_statistics(self) -> bool:
+        """Test statistics endpoint for charts"""
+        # Test with default 7 days
+        success, data = self.make_request('GET', '/reports/statistics?days=7')
+        
+        if success:
+            required_fields = ['daily_sales', 'payment_breakdown', 'top_products', 'period']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                success = False
+                details = f"- Missing fields: {missing_fields}"
+            else:
+                daily_count = len(data.get('daily_sales', []))
+                payment_count = len(data.get('payment_breakdown', []))
+                top_products_count = len(data.get('top_products', []))
+                details = f"- Daily: {daily_count}, Payments: {payment_count}, Top products: {top_products_count}"
+        else:
+            details = f"- {data.get('detail', 'Failed to fetch statistics')}"
+        
+        return self.log_test("Reports Statistics", success, details)
+
+    def test_reports_statistics_different_periods(self) -> bool:
+        """Test statistics with different time periods"""
+        periods = [14, 30, 90]
+        all_success = True
+        details_list = []
+        
+        for days in periods:
+            success, data = self.make_request('GET', f'/reports/statistics?days={days}')
+            if success:
+                period_info = data.get('period', {})
+                actual_days = period_info.get('days', 0)
+                details_list.append(f"{days}d: {actual_days}")
+                if actual_days != days:
+                    all_success = False
+            else:
+                all_success = False
+                details_list.append(f"{days}d: FAILED")
+        
+        details = f"- Periods tested: {', '.join(details_list)}"
+        return self.log_test("Reports Statistics Different Periods", all_success, details)
+
+    def test_export_csv(self) -> bool:
+        """Test CSV export functionality"""
+        # Make request with blob response type simulation
+        url = f"{self.base_url}/api/reports/sales/export/csv"
+        headers = {'Content-Type': 'application/json'}
+        
+        try:
+            response = self.session.get(url, headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                # Check if response is CSV-like
+                content_type = response.headers.get('content-type', '')
+                content_disposition = response.headers.get('content-disposition', '')
+                
+                is_csv = 'text/csv' in content_type or 'attachment' in content_disposition
+                details = f"- Content-Type: {content_type}, Size: {len(response.content)} bytes"
+                
+                if not is_csv:
+                    success = False
+                    details += " (Not CSV format)"
+            else:
+                details = f"- Status: {response.status_code}"
+            
+        except Exception as e:
+            success = False
+            details = f"- Error: {str(e)}"
+        
+        return self.log_test("Export CSV", success, details)
+
+    def test_export_pdf(self) -> bool:
+        """Test PDF export functionality"""
+        url = f"{self.base_url}/api/reports/sales/export/pdf"
+        headers = {'Content-Type': 'application/json'}
+        
+        try:
+            response = self.session.get(url, headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                # Check if response is PDF-like
+                content_type = response.headers.get('content-type', '')
+                content_disposition = response.headers.get('content-disposition', '')
+                
+                is_pdf = 'application/pdf' in content_type or 'attachment' in content_disposition
+                details = f"- Content-Type: {content_type}, Size: {len(response.content)} bytes"
+                
+                if not is_pdf:
+                    success = False
+                    details += " (Not PDF format)"
+            else:
+                details = f"- Status: {response.status_code}"
+            
+        except Exception as e:
+            success = False
+            details = f"- Error: {str(e)}"
+        
+        return self.log_test("Export PDF", success, details)
+
+    def test_export_with_filters(self) -> bool:
+        """Test export with date and status filters"""
+        from datetime import date
+        today = date.today().strftime('%Y-%m-%d')
+        
+        # Test CSV export with filters
+        url = f"{self.base_url}/api/reports/sales/export/csv?start_date={today}&status=completada"
+        
+        try:
+            response = self.session.get(url)
+            success = response.status_code == 200
+            
+            if success:
+                details = f"- CSV with filters: {len(response.content)} bytes"
+            else:
+                details = f"- Status: {response.status_code}"
+            
+        except Exception as e:
+            success = False
+            details = f"- Error: {str(e)}"
+        
+        return self.log_test("Export with Filters", success, details)
+
     def cleanup_test_data(self) -> bool:
         """Clean up test data (requires re-login)"""
         # Re-login for cleanup
@@ -438,6 +606,14 @@ class InventoryAPITester:
             self.test_double_cancel_prevention,
             self.test_insufficient_stock_sale,
             self.test_cash_payment_insufficient,
+            # New reports endpoints tests
+            self.test_reports_sales,
+            self.test_reports_sales_with_filters,
+            self.test_reports_statistics,
+            self.test_reports_statistics_different_periods,
+            self.test_export_csv,
+            self.test_export_pdf,
+            self.test_export_with_filters,
             self.test_logout,
             self.test_unauthorized_access,
             self.cleanup_test_data

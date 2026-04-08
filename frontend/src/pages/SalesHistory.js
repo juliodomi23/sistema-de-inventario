@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
-import { History, XCircle, Eye, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { History, XCircle, Eye, CheckCircle, AlertTriangle, Filter, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -17,23 +20,49 @@ export default function SalesHistory() {
   const [showDetails, setShowDetails] = useState(false);
   const [saleToCancel, setSaleToCancel] = useState(null);
   const [isCanceling, setIsCanceling] = useState(false);
+  
+  // Filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('todas');
+  const [summary, setSummary] = useState(null);
 
   useEffect(() => {
     fetchSales();
   }, []);
 
-  const fetchSales = async () => {
+  const fetchSales = async (applyFilters = false) => {
+    setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/sales?limit=100`, {
+      const params = new URLSearchParams();
+      if (applyFilters) {
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        if (statusFilter !== 'todas') params.append('status', statusFilter);
+      }
+      
+      const response = await axios.get(`${API_URL}/api/reports/sales?${params.toString()}`, {
         withCredentials: true
       });
-      setSales(response.data);
+      setSales(response.data.sales);
+      setSummary(response.data.summary);
     } catch (error) {
       console.error('Error fetching sales:', error);
       toast.error('Error al cargar ventas');
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    fetchSales(true);
+  };
+
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setStatusFilter('todas');
+    fetchSales(false);
   };
 
   const handleCancelSale = async () => {
@@ -116,13 +145,63 @@ export default function SalesHistory() {
         <p className="text-zinc-500 text-sm mt-1">Consulta y gestiona las ventas realizadas</p>
       </div>
 
+      {/* Filters */}
+      <Card className="card-swiss">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="form-group">
+              <Label className="form-label">Fecha Inicio</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="input-swiss"
+                data-testid="filter-start-date"
+              />
+            </div>
+            <div className="form-group">
+              <Label className="form-label">Fecha Fin</Label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="input-swiss"
+                data-testid="filter-end-date"
+              />
+            </div>
+            <div className="form-group">
+              <Label className="form-label">Estado</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="input-swiss" data-testid="filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="completada">Completadas</SelectItem>
+                  <SelectItem value="anulada">Anuladas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={applyFilters} className="btn-primary flex-1" data-testid="apply-filters-button">
+                <Filter className="h-4 w-4 mr-2" />
+                Filtrar
+              </Button>
+              <Button onClick={clearFilters} variant="outline" className="rounded-sm" data-testid="clear-filters-button">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="card-swiss">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-semibold text-zinc-900">{sales.length}</p>
+                <p className="text-2xl font-semibold text-zinc-900">{summary?.total_ventas || sales.length}</p>
                 <p className="text-xs uppercase tracking-wider text-zinc-500">Total Ventas</p>
               </div>
               <History className="h-8 w-8 text-zinc-300" />
@@ -135,7 +214,7 @@ export default function SalesHistory() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-semibold text-emerald-600">
-                  {sales.filter(s => s.estado !== 'anulada').length}
+                  {summary?.ventas_completadas || sales.filter(s => s.estado !== 'anulada').length}
                 </p>
                 <p className="text-xs uppercase tracking-wider text-zinc-500">Completadas</p>
               </div>
@@ -149,11 +228,25 @@ export default function SalesHistory() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-semibold text-rose-600">
-                  {sales.filter(s => s.estado === 'anulada').length}
+                  {summary?.ventas_anuladas || sales.filter(s => s.estado === 'anulada').length}
                 </p>
                 <p className="text-xs uppercase tracking-wider text-zinc-500">Anuladas</p>
               </div>
               <XCircle className="h-8 w-8 text-rose-200" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-swiss">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-2xl font-semibold text-zinc-900">
+                  {formatCurrency(summary?.monto_completadas || 0)}
+                </p>
+                <p className="text-xs uppercase tracking-wider text-zinc-500">Total MXN</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-zinc-200" />
             </div>
           </CardContent>
         </Card>
