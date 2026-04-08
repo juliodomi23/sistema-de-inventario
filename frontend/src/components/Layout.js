@@ -53,19 +53,21 @@ export default function Layout({ children }) {
             </nav>
 
             {/* User Menu */}
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-zinc-600 hidden sm:block" data-testid="user-name">
-                {user?.name}
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-zinc-100 rounded-sm">
+                <span className="text-sm text-zinc-600" data-testid="user-name">
+                  {user?.name}
+                </span>
+              </div>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={handleLogout}
-                className="text-zinc-600 hover:text-zinc-900"
+                className="text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 border-zinc-200"
                 data-testid="logout-button"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Salir</span>
+                Salir
               </Button>
 
               {/* Mobile Menu Button */}
