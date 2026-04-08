@@ -1,34 +1,59 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
-}
-
-.App-header {
-    background-color: #0f0f10;
+/* App specific styles */
+.App {
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
 }
 
-.App-link {
-    color: #61dafb;
+/* Login background */
+.login-bg {
+    background: linear-gradient(135deg, #f4f4f5 0%, #ffffff 100%);
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Navigation */
+.nav-link {
+    @apply px-4 py-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-sm transition-colors;
+}
+
+.nav-link-active {
+    @apply px-4 py-2 text-zinc-900 bg-zinc-100 rounded-sm font-medium;
+}
+
+/* Dashboard cards */
+.metric-card {
+    @apply bg-white border border-zinc-200 rounded-sm p-6 hover:border-zinc-300 transition-colors;
+}
+
+.metric-value {
+    @apply text-3xl font-semibold text-zinc-900 tracking-tight;
+}
+
+.metric-label {
+    @apply text-xs uppercase tracking-widest text-zinc-500 mt-1;
+}
+
+/* Form styles */
+.form-group {
+    @apply space-y-2;
+}
+
+.form-label {
+    @apply text-sm font-medium text-zinc-700;
+}
+
+/* POS styles */
+.cart-item {
+    @apply flex items-center justify-between py-3 border-b border-zinc-100 last:border-0;
+}
+
+.cart-total {
+    @apply text-xl font-semibold text-zinc-900 border-t border-zinc-200 pt-4 mt-4;
+}
+
+/* Empty state */
+.empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-zinc-400;
+}
+
+/* Status badge */
+.status-badge {
+    @apply inline-flex items-center px-2 py-1 rounded-sm text-xs font-medium;
 }
