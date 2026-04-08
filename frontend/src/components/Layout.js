@@ -1,15 +1,15 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { LayoutDashboard, Package, ShoppingCart, History, BarChart3, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, History, BarChart3, LogOut, Menu, X, User } from 'lucide-react';
 import { useState } from 'react';
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/productos', icon: Package, label: 'Productos' },
-  { to: '/ventas', icon: ShoppingCart, label: 'Ventas' },
-  { to: '/historial', icon: History, label: 'Historial' },
-  { to: '/reportes', icon: BarChart3, label: 'Reportes' },
+const allNavItems = [
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin'] },
+  { to: '/productos', icon: Package, label: 'Productos', roles: ['admin'] },
+  { to: '/ventas', icon: ShoppingCart, label: 'Ventas', roles: ['admin', 'vendedor'] },
+  { to: '/historial', icon: History, label: 'Historial', roles: ['admin'] },
+  { to: '/reportes', icon: BarChart3, label: 'Reportes', roles: ['admin'] },
 ];
 
 export default function Layout({ children }) {
@@ -20,6 +20,27 @@ export default function Layout({ children }) {
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  // Filter nav items based on user role
+  const navItems = allNavItems.filter(item => 
+    item.roles.includes(user?.role || 'user')
+  );
+
+  const getRoleBadge = (role) => {
+    const styles = {
+      admin: 'bg-zinc-900 text-white',
+      vendedor: 'bg-emerald-600 text-white'
+    };
+    const labels = {
+      admin: 'Admin',
+      vendedor: 'Vendedor'
+    };
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded-sm ${styles[role] || 'bg-zinc-200'}`}>
+        {labels[role] || role}
+      </span>
+    );
   };
 
   return (
@@ -57,9 +78,11 @@ export default function Layout({ children }) {
             {/* User Menu */}
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-zinc-100 rounded-sm">
+                <User className="h-4 w-4 text-zinc-500" />
                 <span className="text-sm text-zinc-600" data-testid="user-name">
                   {user?.name}
                 </span>
+                {getRoleBadge(user?.role)}
               </div>
               <Button
                 variant="outline"

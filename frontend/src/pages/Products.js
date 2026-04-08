@@ -14,10 +14,12 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const UNIT_OPTIONS = [
   { value: 'kg', label: 'Kilogramos (kg)' },
+  { value: 'gramos', label: 'Gramos (g)' },
   { value: 'L', label: 'Litros (L)' },
   { value: 'piezas', label: 'Piezas' },
-  { value: 'metros', label: 'Metros' },
+  { value: 'bolsas', label: 'Bolsas' },
   { value: 'cajas', label: 'Cajas' },
+  { value: 'metros', label: 'Metros' },
 ];
 
 const initialFormState = {

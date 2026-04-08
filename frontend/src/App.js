@@ -10,7 +10,7 @@ import SalesHistory from './pages/SalesHistory';
 import Reports from './pages/Reports';
 import './App.css';
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedRoles = [] }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -23,6 +23,15 @@ function ProtectedRoute({ children }) {
 
   if (user === false) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check role access if allowedRoles is specified
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
+    // Redirect vendedor to sales page
+    if (user?.role === 'vendedor') {
+      return <Navigate to="/ventas" replace />;
+    }
+    return <Navigate to="/" replace />;
   }
 
   return <Layout>{children}</Layout>;
@@ -40,10 +49,23 @@ function PublicRoute({ children }) {
   }
 
   if (user) {
+    // Redirect based on role
+    if (user.role === 'vendedor') {
+      return <Navigate to="/ventas" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 
   return children;
+}
+
+function DefaultRedirect() {
+  const { user } = useAuth();
+  
+  if (user?.role === 'vendedor') {
+    return <Navigate to="/ventas" replace />;
+  }
+  return <Navigate to="/" replace />;
 }
 
 function AppRoutes() {
@@ -60,7 +82,7 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin']}>
             <Dashboard />
           </ProtectedRoute>
         }
@@ -68,7 +90,7 @@ function AppRoutes() {
       <Route
         path="/productos"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin']}>
             <Products />
           </ProtectedRoute>
         }
@@ -76,7 +98,7 @@ function AppRoutes() {
       <Route
         path="/ventas"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin', 'vendedor']}>
             <Sales />
           </ProtectedRoute>
         }
@@ -84,7 +106,7 @@ function AppRoutes() {
       <Route
         path="/historial"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin']}>
             <SalesHistory />
           </ProtectedRoute>
         }
@@ -92,12 +114,12 @@ function AppRoutes() {
       <Route
         path="/reportes"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin']}>
             <Reports />
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<DefaultRedirect />} />
     </Routes>
   );
 }

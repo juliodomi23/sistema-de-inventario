@@ -56,6 +56,8 @@ class UnitType(str, Enum):
     PIEZAS = "piezas"
     METROS = "metros"
     CAJAS = "cajas"
+    GRAMOS = "gramos"
+    BOLSAS = "bolsas"
 
 class PaymentMethod(str, Enum):
     EFECTIVO = "efectivo"
@@ -1050,6 +1052,22 @@ async def startup_event():
         )
         logger.info(f"Admin password updated: {admin_email}")
     
+    # Seed vendedor user
+    vendedor_email = "vendedor@inventario.com"
+    vendedor_password = "vendedor123"
+    
+    existing_vendedor = await db.users.find_one({"email": vendedor_email})
+    if existing_vendedor is None:
+        hashed = hash_password(vendedor_password)
+        await db.users.insert_one({
+            "email": vendedor_email,
+            "password_hash": hashed,
+            "name": "Vendedor",
+            "role": "vendedor",
+            "created_at": datetime.now(timezone.utc)
+        })
+        logger.info(f"Vendedor user created: {vendedor_email}")
+    
     # Write test credentials
     memory_dir = Path("/app/memory")
     memory_dir.mkdir(exist_ok=True)
@@ -1060,6 +1078,13 @@ async def startup_event():
 - Email: {admin_email}
 - Password: {admin_password}
 - Role: admin
+- Access: Todas las secciones
+
+## Vendedor User
+- Email: {vendedor_email}
+- Password: {vendedor_password}
+- Role: vendedor
+- Access: Solo Ventas (POS)
 
 ## Auth Endpoints
 - POST /api/auth/register
