@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Sales from './pages/Sales';
+import SalesHistory from './pages/SalesHistory';
 import './App.css';
 
 function ProtectedRoute({ children }) {
@@ -76,6 +77,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Sales />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/historial"
+        element={
+          <ProtectedRoute>
+            <SalesHistory />
           </ProtectedRoute>
         }
       />

@@ -313,6 +313,65 @@ class InventoryAPITester:
         
         return self.log_test("Insufficient Cash Payment (400)", success, details)
 
+    def test_cancel_sale(self) -> bool:
+        """Test sale cancellation and stock restoration"""
+        if not self.created_sale_id:
+            return self.log_test("Cancel Sale", False, "- No sale ID available")
+        
+        # Get initial product stock before cancellation
+        success, initial_product = self.make_request('GET', f'/products/{self.created_product_id}')
+        if not success:
+            return self.log_test("Cancel Sale - Get Initial Stock", False, "- Could not get product stock")
+        
+        initial_stock = initial_product.get('cantidad_stock', 0)
+        
+        # Cancel the sale
+        success, data = self.make_request('POST', f'/sales/{self.created_sale_id}/cancel')
+        
+        if success:
+            # Verify stock was restored
+            stock_success, updated_product = self.make_request('GET', f'/products/{self.created_product_id}')
+            if stock_success:
+                new_stock = updated_product.get('cantidad_stock', 0)
+                expected_stock = initial_stock + 2.0  # We sold 2 units earlier
+                stock_restored = new_stock == expected_stock
+                
+                # Verify sale status changed
+                sales_success, sales_data = self.make_request('GET', '/sales')
+                sale_status_updated = False
+                if sales_success:
+                    for sale in sales_data:
+                        if sale.get('id') == self.created_sale_id:
+                            sale_status_updated = sale.get('estado') == 'anulada'
+                            break
+                
+                if stock_restored and sale_status_updated:
+                    details = f"- Stock restored: {new_stock}, Status: anulada"
+                else:
+                    details = f"- Stock restored: {stock_restored}, Status updated: {sale_status_updated}"
+                
+                return self.log_test("Cancel Sale", stock_restored and sale_status_updated, details)
+            else:
+                return self.log_test("Cancel Sale - Verify Stock", False, "- Could not verify stock restoration")
+        else:
+            details = f"- {data.get('detail', 'Cancellation failed')}"
+            return self.log_test("Cancel Sale", success, details)
+
+    def test_double_cancel_prevention(self) -> bool:
+        """Test that already cancelled sales cannot be cancelled again"""
+        if not self.created_sale_id:
+            return self.log_test("Double Cancel Prevention", False, "- No sale ID available")
+        
+        # Try to cancel the already cancelled sale
+        success, data = self.make_request('POST', f'/sales/{self.created_sale_id}/cancel', expected_status=400)
+        
+        if success:
+            details = f"- Correctly prevented: {data.get('detail', '')}"
+        else:
+            details = f"- Should have been rejected with 400"
+        
+        return self.log_test("Double Cancel Prevention (400)", success, details)
+
     def test_logout(self) -> bool:
         """Test logout functionality"""
         success, data = self.make_request('POST', '/auth/logout')
@@ -375,6 +434,8 @@ class InventoryAPITester:
             self.test_create_sale,
             self.test_list_sales,
             self.test_today_sales_summary,
+            self.test_cancel_sale,
+            self.test_double_cancel_prevention,
             self.test_insufficient_stock_sale,
             self.test_cash_payment_insufficient,
             self.test_logout,

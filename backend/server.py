@@ -120,6 +120,7 @@ class SaleResponse(BaseModel):
     monto_total: float
     cambio: Optional[float]
     items: List[SaleItemResponse]
+    estado: str = "completada"
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -498,7 +499,8 @@ async def create_sale(sale: SaleCreate, request: Request):
         metodo_pago=sale_doc["metodo_pago"],
         monto_total=sale_doc["monto_total"],
         cambio=sale_doc["cambio"],
-        items=items_response
+        items=items_response,
+        estado="completada"
     )
 
 @api_router.get("/sales", response_model=List[SaleResponse])
@@ -513,10 +515,61 @@ async def list_sales(request: Request, limit: int = 50):
             metodo_pago=s["metodo_pago"],
             monto_total=s["monto_total"],
             cambio=s.get("cambio"),
-            items=[SaleItemResponse(**item) for item in s.get("items", [])]
+            items=[SaleItemResponse(**item) for item in s.get("items", [])],
+            estado=s.get("estado", "completada")
         )
         for s in sales
     ]
+
+@api_router.post("/sales/{sale_id}/cancel")
+async def cancel_sale(sale_id: str, request: Request):
+    """Anula una venta y restaura el stock de los productos"""
+    user = await get_current_user(request)
+    
+    # Find the sale
+    sale = await db.sales.find_one({"_id": ObjectId(sale_id)})
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    
+    if sale.get("estado") == "anulada":
+        raise HTTPException(status_code=400, detail="Esta venta ya fue anulada")
+    
+    # Restore stock for each item
+    for item in sale.get("items", []):
+        product = await db.products.find_one({"_id": ObjectId(item["producto_id"])})
+        if product:
+            new_stock = product["cantidad_stock"] + item["cantidad_vendida"]
+            await db.products.update_one(
+                {"_id": ObjectId(item["producto_id"])},
+                {"$set": {"cantidad_stock": new_stock}}
+            )
+            # Log stock restoration
+            await db.stock_logs.insert_one({
+                "producto_id": item["producto_id"],
+                "cantidad_anterior": product["cantidad_stock"],
+                "cantidad_nueva": new_stock,
+                "tipo": "anulacion_venta",
+                "venta_id": sale_id,
+                "fecha": datetime.now(timezone.utc)
+            })
+    
+    # Update sale status
+    await db.sales.update_one(
+        {"_id": ObjectId(sale_id)},
+        {
+            "$set": {
+                "estado": "anulada",
+                "fecha_anulacion": datetime.now(timezone.utc),
+                "anulada_por": user["id"]
+            }
+        }
+    )
+    
+    return {
+        "message": "Venta anulada exitosamente",
+        "sale_id": sale_id,
+        "stock_restored": True
+    }
 
 @api_router.get("/sales/today-summary")
 async def get_today_summary(request: Request):
