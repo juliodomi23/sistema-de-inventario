@@ -13,7 +13,6 @@ import jwt
 import secrets
 import csv
 import io
-from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta, date
@@ -30,8 +29,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-ROOT_DIR = Path(__file__).parent
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -67,8 +64,14 @@ class PaymentMethod(str, Enum):
 # Auth Models
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
-    name: str
+    password: str = Field(min_length=8, max_length=100)
+    name: str = Field(min_length=1, max_length=100)
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=100)
+    name: str = Field(min_length=1, max_length=100)
+    role: str = Field(default="vendedor")
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -83,18 +86,18 @@ class UserResponse(BaseModel):
 
 # Product Models
 class ProductCreate(BaseModel):
-    nombre: str
-    precio_unitario: float
+    nombre: str = Field(min_length=1, max_length=200)
+    precio_unitario: float = Field(gt=0)
     unidad_medida: UnitType
-    cantidad_stock: float
-    cantidad_minima: float
+    cantidad_stock: float = Field(ge=0)
+    cantidad_minima: float = Field(ge=0)
 
 class ProductUpdate(BaseModel):
     nombre: Optional[str] = None
-    precio_unitario: Optional[float] = None
+    precio_unitario: Optional[float] = Field(default=None, gt=0)
     unidad_medida: Optional[UnitType] = None
-    cantidad_stock: Optional[float] = None
-    cantidad_minima: Optional[float] = None
+    cantidad_stock: Optional[float] = Field(default=None, ge=0)
+    cantidad_minima: Optional[float] = Field(default=None, ge=0)
 
 class ProductResponse(BaseModel):
     id: str
@@ -197,39 +200,28 @@ def get_stock_status(cantidad_stock: float, cantidad_minima: float) -> str:
     else:
         return "green"
 
-# ==================== AUTH ENDPOINTS ====================
+IS_PRODUCTION = os.environ.get("ENVIRONMENT", "development") == "production"
 
-@api_router.post("/auth/register", response_model=UserResponse)
-async def register(user_data: UserCreate, response: Response):
-    email = user_data.email.lower()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="El correo ya está registrado")
-    
-    hashed = hash_password(user_data.password)
-    user_doc = {
-        "email": email,
-        "password_hash": hashed,
-        "name": user_data.name,
-        "role": "user",
-        "created_at": datetime.now(timezone.utc)
-    }
-    result = await db.users.insert_one(user_doc)
-    user_id = str(result.inserted_id)
-    
-    access_token = create_access_token(user_id, email)
-    refresh_token = create_refresh_token(user_id)
-    
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-    
-    return UserResponse(
-        id=user_id,
-        email=email,
-        name=user_data.name,
-        role="user",
-        created_at=user_doc["created_at"]
-    )
+from bson.errors import InvalidId
+def parse_object_id(id_str: str) -> ObjectId:
+    try:
+        return ObjectId(id_str)
+    except InvalidId:
+        raise HTTPException(status_code=400, detail=f"ID inválido: {id_str}")
+
+async def require_admin(request: Request) -> dict:
+    user = await get_current_user(request)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol de administrador")
+    return user
+
+async def require_seller_or_admin(request: Request) -> dict:
+    user = await get_current_user(request)
+    if user["role"] not in ("admin", "vendedor"):
+        raise HTTPException(status_code=403, detail="Acceso no autorizado")
+    return user
+
+# ==================== AUTH ENDPOINTS ====================
 
 @api_router.post("/auth/login", response_model=UserResponse)
 async def login(credentials: UserLogin, request: Request, response: Response):
@@ -265,9 +257,9 @@ async def login(credentials: UserLogin, request: Request, response: Response):
     access_token = create_access_token(user_id, email)
     refresh_token = create_refresh_token(user_id)
     
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-    
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=IS_PRODUCTION, samesite="lax", max_age=3600, path="/")
+    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=IS_PRODUCTION, samesite="lax", max_age=604800, path="/")
+
     return UserResponse(
         id=user_id,
         email=user["email"],
@@ -302,18 +294,81 @@ async def refresh_token(request: Request, response: Response):
         
         user_id = str(user["_id"])
         access_token = create_access_token(user_id, user["email"])
-        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=3600, path="/")
+        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=IS_PRODUCTION, samesite="lax", max_age=3600, path="/")
         return {"message": "Token refreshed"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
+# ==================== ADMIN USER ENDPOINTS ====================
+
+@api_router.get("/admin/users")
+async def list_users(user: dict = Depends(require_admin)):
+    users = await db.users.find({}, {"password_hash": 0}).sort("created_at", -1).to_list(500)
+    return [
+        {
+            "id": str(u["_id"]),
+            "email": u["email"],
+            "name": u["name"],
+            "role": u.get("role", "vendedor"),
+            "created_at": u.get("created_at", datetime.now(timezone.utc)).isoformat()
+        }
+        for u in users
+    ]
+
+@api_router.post("/admin/users", status_code=201)
+async def create_user(user_data: AdminUserCreate, current_user: dict = Depends(require_admin)):
+    email = user_data.email.lower()
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
+
+    if user_data.role not in ("admin", "vendedor"):
+        raise HTTPException(status_code=400, detail="Rol inválido. Use 'admin' o 'vendedor'")
+
+    user_doc = {
+        "email": email,
+        "password_hash": hash_password(user_data.password),
+        "name": user_data.name,
+        "role": user_data.role,
+        "created_at": datetime.now(timezone.utc)
+    }
+    result = await db.users.insert_one(user_doc)
+    return {
+        "id": str(result.inserted_id),
+        "email": email,
+        "name": user_data.name,
+        "role": user_data.role,
+        "created_at": user_doc["created_at"].isoformat()
+    }
+
+@api_router.delete("/admin/users/{user_id}")
+async def delete_user(user_id: str, current_user: dict = Depends(require_admin)):
+    oid = parse_object_id(user_id)
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propia cuenta")
+    result = await db.users.delete_one({"_id": oid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return {"message": "Usuario eliminado"}
+
+@api_router.put("/admin/users/{user_id}/password")
+async def update_user_password(user_id: str, data: dict, current_user: dict = Depends(require_admin)):
+    oid = parse_object_id(user_id)
+    new_password = data.get("password", "")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    await db.users.update_one(
+        {"_id": oid},
+        {"$set": {"password_hash": hash_password(new_password)}}
+    )
+    return {"message": "Contraseña actualizada"}
+
 # ==================== PRODUCT ENDPOINTS ====================
 
 @api_router.post("/products", response_model=ProductResponse)
-async def create_product(product: ProductCreate, request: Request):
-    await get_current_user(request)
+async def create_product(product: ProductCreate, user: dict = Depends(require_admin)):
     
     product_doc = {
         "nombre": product.nombre,
@@ -346,8 +401,7 @@ async def create_product(product: ProductCreate, request: Request):
     )
 
 @api_router.get("/products", response_model=List[ProductResponse])
-async def list_products(request: Request):
-    await get_current_user(request)
+async def list_products(user: dict = Depends(require_admin)):
     
     products = await db.products.find({}).to_list(1000)
     return [
@@ -365,10 +419,8 @@ async def list_products(request: Request):
     ]
 
 @api_router.get("/products/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: str, request: Request):
-    await get_current_user(request)
-    
-    product = await db.products.find_one({"_id": ObjectId(product_id)})
+async def get_product(product_id: str, user: dict = Depends(require_admin)):
+    product = await db.products.find_one({"_id": parse_object_id(product_id)})
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
@@ -384,17 +436,16 @@ async def get_product(product_id: str, request: Request):
     )
 
 @api_router.put("/products/{product_id}", response_model=ProductResponse)
-async def update_product(product_id: str, product: ProductUpdate, request: Request):
-    await get_current_user(request)
-    
-    existing = await db.products.find_one({"_id": ObjectId(product_id)})
+async def update_product(product_id: str, product: ProductUpdate, user: dict = Depends(require_admin)):
+    oid = parse_object_id(product_id)
+    existing = await db.products.find_one({"_id": oid})
     if not existing:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    
+
     update_data = {k: v for k, v in product.model_dump().items() if v is not None}
     if "unidad_medida" in update_data:
         update_data["unidad_medida"] = update_data["unidad_medida"].value
-    
+
     if "cantidad_stock" in update_data and update_data["cantidad_stock"] != existing["cantidad_stock"]:
         await db.stock_logs.insert_one({
             "producto_id": product_id,
@@ -403,10 +454,10 @@ async def update_product(product_id: str, product: ProductUpdate, request: Reque
             "tipo": "actualizacion",
             "fecha": datetime.now(timezone.utc)
         })
-    
-    await db.products.update_one({"_id": ObjectId(product_id)}, {"$set": update_data})
-    
-    updated = await db.products.find_one({"_id": ObjectId(product_id)})
+
+    await db.products.update_one({"_id": oid}, {"$set": update_data})
+
+    updated = await db.products.find_one({"_id": oid})
     return ProductResponse(
         id=str(updated["_id"]),
         nombre=updated["nombre"],
@@ -419,10 +470,8 @@ async def update_product(product_id: str, product: ProductUpdate, request: Reque
     )
 
 @api_router.delete("/products/{product_id}")
-async def delete_product(product_id: str, request: Request):
-    await get_current_user(request)
-    
-    result = await db.products.delete_one({"_id": ObjectId(product_id)})
+async def delete_product(product_id: str, user: dict = Depends(require_admin)):
+    result = await db.products.delete_one({"_id": parse_object_id(product_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
@@ -431,27 +480,25 @@ async def delete_product(product_id: str, request: Request):
 # ==================== SALES ENDPOINTS ====================
 
 @api_router.post("/sales", response_model=SaleResponse)
-async def create_sale(sale: SaleCreate, request: Request):
-    await get_current_user(request)
-    
+async def create_sale(sale: SaleCreate, user: dict = Depends(require_seller_or_admin)):
     items_response = []
     monto_total = 0
     stock_updates = []
-    
+
     # Validate all items first
     for item in sale.items:
-        product = await db.products.find_one({"_id": ObjectId(item.producto_id)})
+        product = await db.products.find_one({"_id": parse_object_id(item.producto_id)})
         if not product:
             raise HTTPException(status_code=404, detail=f"Producto {item.producto_id} no encontrado")
         if product["cantidad_stock"] < item.cantidad:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Stock insuficiente para {product['nombre']}. Disponible: {product['cantidad_stock']}"
             )
-        
+
         subtotal = product["precio_unitario"] * item.cantidad
         monto_total += subtotal
-        
+
         items_response.append(SaleItemResponse(
             producto_id=item.producto_id,
             producto_nombre=product["nombre"],
@@ -459,13 +506,14 @@ async def create_sale(sale: SaleCreate, request: Request):
             precio_unitario=product["precio_unitario"],
             subtotal=subtotal
         ))
-        
+
         stock_updates.append({
             "producto_id": item.producto_id,
+            "nombre": product["nombre"],
             "cantidad": item.cantidad,
             "stock_anterior": product["cantidad_stock"]
         })
-    
+
     # Validate cash payment
     cambio = None
     if sale.metodo_pago == PaymentMethod.EFECTIVO:
@@ -474,7 +522,7 @@ async def create_sale(sale: SaleCreate, request: Request):
         if sale.monto_recibido < monto_total:
             raise HTTPException(status_code=400, detail="El monto recibido es menor al total")
         cambio = round(sale.monto_recibido - monto_total, 2)
-    
+
     # Create sale document
     sale_doc = {
         "fecha_venta": datetime.now(timezone.utc),
@@ -486,14 +534,20 @@ async def create_sale(sale: SaleCreate, request: Request):
         "estado": "completada"
     }
     result = await db.sales.insert_one(sale_doc)
-    
-    # Update stock for all products
+
+    # Update stock atomically
     for update in stock_updates:
-        new_stock = update["stock_anterior"] - update["cantidad"]
-        await db.products.update_one(
-            {"_id": ObjectId(update["producto_id"])},
-            {"$set": {"cantidad_stock": new_stock}}
+        atomic_result = await db.products.update_one(
+            {
+                "_id": parse_object_id(update["producto_id"]),
+                "cantidad_stock": {"$gte": update["cantidad"]}
+            },
+            {"$inc": {"cantidad_stock": -update["cantidad"]}}
         )
+        if atomic_result.matched_count == 0:
+            raise HTTPException(status_code=409, detail=f"Stock insuficiente en {update.get('nombre', update['producto_id'])} (conflicto concurrente)")
+
+        new_stock = update["stock_anterior"] - update["cantidad"]
         await db.stock_logs.insert_one({
             "producto_id": update["producto_id"],
             "cantidad_anterior": update["stock_anterior"],
@@ -514,8 +568,7 @@ async def create_sale(sale: SaleCreate, request: Request):
     )
 
 @api_router.get("/sales", response_model=List[SaleResponse])
-async def list_sales(request: Request, limit: int = 50):
-    await get_current_user(request)
+async def list_sales(limit: int = 50, user: dict = Depends(require_admin)):
     
     sales = await db.sales.find({}).sort("fecha_venta", -1).limit(limit).to_list(limit)
     return [
@@ -532,12 +585,9 @@ async def list_sales(request: Request, limit: int = 50):
     ]
 
 @api_router.post("/sales/{sale_id}/cancel")
-async def cancel_sale(sale_id: str, request: Request):
+async def cancel_sale(sale_id: str, user: dict = Depends(require_admin)):
     """Anula una venta y restaura el stock de los productos"""
-    user = await get_current_user(request)
-    
-    # Find the sale
-    sale = await db.sales.find_one({"_id": ObjectId(sale_id)})
+    sale = await db.sales.find_one({"_id": parse_object_id(sale_id)})
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     
@@ -546,14 +596,13 @@ async def cancel_sale(sale_id: str, request: Request):
     
     # Restore stock for each item
     for item in sale.get("items", []):
-        product = await db.products.find_one({"_id": ObjectId(item["producto_id"])})
+        product = await db.products.find_one({"_id": parse_object_id(item["producto_id"])})
         if product:
             new_stock = product["cantidad_stock"] + item["cantidad_vendida"]
             await db.products.update_one(
-                {"_id": ObjectId(item["producto_id"])},
+                {"_id": parse_object_id(item["producto_id"])},
                 {"$set": {"cantidad_stock": new_stock}}
             )
-            # Log stock restoration
             await db.stock_logs.insert_one({
                 "producto_id": item["producto_id"],
                 "cantidad_anterior": product["cantidad_stock"],
@@ -562,10 +611,10 @@ async def cancel_sale(sale_id: str, request: Request):
                 "venta_id": sale_id,
                 "fecha": datetime.now(timezone.utc)
             })
-    
+
     # Update sale status
     await db.sales.update_one(
-        {"_id": ObjectId(sale_id)},
+        {"_id": parse_object_id(sale_id)},
         {
             "$set": {
                 "estado": "anulada",
@@ -585,13 +634,12 @@ async def cancel_sale(sale_id: str, request: Request):
 
 @api_router.get("/reports/sales")
 async def get_sales_report(
-    request: Request,
     start_date: Optional[str] = Query(None, description="Fecha inicio YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="Fecha fin YYYY-MM-DD"),
-    status: Optional[str] = Query(None, description="Estado: completada, anulada, todas")
+    status: Optional[str] = Query(None, description="Estado: completada, anulada, todas"),
+    user: dict = Depends(require_admin)
 ):
     """Obtiene ventas filtradas por fecha y estado"""
-    await get_current_user(request)
     
     query = {}
     
@@ -641,13 +689,12 @@ async def get_sales_report(
 
 @api_router.get("/reports/sales/export/csv")
 async def export_sales_csv(
-    request: Request,
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
-    status: Optional[str] = Query(None)
+    status: Optional[str] = Query(None),
+    user: dict = Depends(require_admin)
 ):
     """Exporta ventas a CSV"""
-    await get_current_user(request)
     
     query = {}
     if start_date or end_date:
@@ -699,13 +746,12 @@ async def export_sales_csv(
 
 @api_router.get("/reports/sales/export/pdf")
 async def export_sales_pdf(
-    request: Request,
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
-    status: Optional[str] = Query(None)
+    status: Optional[str] = Query(None),
+    user: dict = Depends(require_admin)
 ):
     """Exporta ventas a PDF"""
-    await get_current_user(request)
     
     query = {}
     if start_date or end_date:
@@ -819,11 +865,10 @@ async def export_sales_pdf(
 
 @api_router.get("/reports/statistics")
 async def get_statistics(
-    request: Request,
-    days: int = Query(7, description="Número de días para estadísticas")
+    days: int = Query(7, description="Número de días para estadísticas"),
+    user: dict = Depends(require_admin)
 ):
     """Obtiene estadísticas de ventas para gráficas"""
-    await get_current_user(request)
     
     end_date = datetime.now(timezone.utc).replace(hour=23, minute=59, second=59)
     start_date = (end_date - timedelta(days=days-1)).replace(hour=0, minute=0, second=0)
@@ -930,8 +975,7 @@ async def get_statistics(
     }
 
 @api_router.get("/sales/today-summary")
-async def get_today_summary(request: Request):
-    await get_current_user(request)
+async def get_today_summary(user: dict = Depends(require_admin)):
     
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
@@ -955,8 +999,7 @@ async def get_today_summary(request: Request):
     return {"total_ventas": 0, "cantidad_ventas": 0}
 
 @api_router.get("/dashboard/summary")
-async def get_dashboard_summary(request: Request):
-    await get_current_user(request)
+async def get_dashboard_summary(user: dict = Depends(require_admin)):
     
     # Get product counts by status
     products = await db.products.find({}).to_list(1000)
@@ -1003,6 +1046,14 @@ async def get_dashboard_summary(request: Request):
 
 # ==================== ROOT ENDPOINT ====================
 
+@api_router.get("/health")
+async def health_check():
+    try:
+        await db.command("ping")
+        return {"status": "ok", "db": "connected"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
 @api_router.get("/")
 async def root():
     return {"message": "Sistema de Inventario MVP API"}
@@ -1011,13 +1062,15 @@ async def root():
 app.include_router(api_router)
 
 # CORS Configuration
-frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [o.strip() for o in origins_str.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=[frontend_url, "http://localhost:3000", "https://stock-mvp-1.preview.emergentagent.com"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Cookie"],
 )
 
 # ==================== STARTUP EVENTS ====================
@@ -1053,9 +1106,9 @@ async def startup_event():
         logger.info(f"Admin password updated: {admin_email}")
     
     # Seed vendedor user
-    vendedor_email = "vendedor@inventario.com"
-    vendedor_password = "vendedor123"
-    
+    vendedor_email = os.environ.get("VENDEDOR_EMAIL", "vendedor@inventario.com")
+    vendedor_password = os.environ.get("VENDEDOR_PASSWORD", "vendedor123")
+
     existing_vendedor = await db.users.find_one({"email": vendedor_email})
     if existing_vendedor is None:
         hashed = hash_password(vendedor_password)
@@ -1067,46 +1120,6 @@ async def startup_event():
             "created_at": datetime.now(timezone.utc)
         })
         logger.info(f"Vendedor user created: {vendedor_email}")
-    
-    # Write test credentials
-    memory_dir = Path("/app/memory")
-    memory_dir.mkdir(exist_ok=True)
-    with open(memory_dir / "test_credentials.md", "w") as f:
-        f.write(f"""# Test Credentials
-
-## Admin User
-- Email: {admin_email}
-- Password: {admin_password}
-- Role: admin
-- Access: Todas las secciones
-
-## Vendedor User
-- Email: {vendedor_email}
-- Password: {vendedor_password}
-- Role: vendedor
-- Access: Solo Ventas (POS)
-
-## Auth Endpoints
-- POST /api/auth/register
-- POST /api/auth/login
-- POST /api/auth/logout
-- GET /api/auth/me
-- POST /api/auth/refresh
-
-## Product Endpoints
-- GET /api/products
-- POST /api/products
-- GET /api/products/:id
-- PUT /api/products/:id
-- DELETE /api/products/:id
-
-## Sales Endpoints
-- GET /api/sales
-- POST /api/sales
-- GET /api/sales/today-summary
-- GET /api/dashboard/summary
-""")
-    logger.info("Test credentials written to /app/memory/test_credentials.md")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

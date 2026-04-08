@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Plus, Pencil, Trash2, Package, AlertCircle } from 'lucide-react';
@@ -38,6 +39,7 @@ export default function Products() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   useEffect(() => {
     fetchProducts();
@@ -144,17 +146,18 @@ export default function Products() {
     }
   };
 
-  const handleDelete = async (productId) => {
-    if (!window.confirm('¿Está seguro de eliminar este producto?')) return;
-
+  const handleDelete = async () => {
+    if (!productToDelete) return;
     try {
-      await axios.delete(`${API_URL}/api/products/${productId}`, {
+      await axios.delete(`${API_URL}/api/products/${productToDelete.id}`, {
         withCredentials: true
       });
       toast.success('Producto eliminado');
       fetchProducts();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al eliminar producto');
+    } finally {
+      setProductToDelete(null);
     }
   };
 
@@ -358,9 +361,10 @@ export default function Products() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(product.id)}
+                          onClick={() => setProductToDelete(product)}
                           className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                           data-testid={`product-delete-button-${product.id}`}
+                          aria-label={`Eliminar ${product.nombre}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -379,6 +383,25 @@ export default function Products() {
           )}
         </CardContent>
       </Card>
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading">¿Eliminar este producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará permanentemente <strong>{productToDelete?.nombre}</strong>. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

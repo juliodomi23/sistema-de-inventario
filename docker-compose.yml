@@ -1,0 +1,47 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=${DB_NAME:-inventario}
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - VENDEDOR_EMAIL=${VENDEDOR_EMAIL:-vendedor@inventario.com}
+      - VENDEDOR_PASSWORD=${VENDEDOR_PASSWORD}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - ENVIRONMENT=production
+    depends_on:
+      - mongo
+    networks:
+      - app
+      - easypanel
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - REACT_APP_BACKEND_URL=
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - app
+      - easypanel
+
+volumes:
+  mongo_data:
+
+networks:
+  app:
+  easypanel:
+    external: true

@@ -8,6 +8,7 @@ import Products from './pages/Products';
 import Sales from './pages/Sales';
 import SalesHistory from './pages/SalesHistory';
 import Reports from './pages/Reports';
+import Users from './pages/Users';
 import './App.css';
 
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -116,6 +117,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <Reports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/usuarios"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <Users />
           </ProtectedRoute>
         }
       />

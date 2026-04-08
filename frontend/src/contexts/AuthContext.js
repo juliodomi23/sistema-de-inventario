@@ -55,23 +55,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (email, password, name) => {
-    try {
-      const response = await axios.post(
-        `${API_URL}/api/auth/register`,
-        { email, password, name },
-        { withCredentials: true }
-      );
-      setUser(response.data);
-      return { success: true };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: formatApiErrorDetail(error.response?.data?.detail) || error.message 
-      };
-    }
-  };
-
   const logout = async () => {
     try {
       await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
@@ -83,7 +66,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );

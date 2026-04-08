@@ -347,7 +347,7 @@ export default function Sales() {
         </div>
 
         {/* Cart & Payment */}
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
           {/* Cart */}
           <Card className="card-swiss">
             <CardHeader className="pb-3">
@@ -369,7 +369,7 @@ export default function Sales() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0"
+                          className="h-9 w-9 p-0"
                           onClick={() => updateCartItemQuantity(item.producto_id, item.cantidad - 1)}
                           data-testid={`cart-decrease-${item.producto_id}`}
                         >
@@ -379,7 +379,7 @@ export default function Sales() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0"
+                          className="h-9 w-9 p-0"
                           onClick={() => updateCartItemQuantity(item.producto_id, item.cantidad + 1)}
                           data-testid={`cart-increase-${item.producto_id}`}
                         >

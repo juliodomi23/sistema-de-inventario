@@ -118,14 +118,14 @@ export default function SalesHistory() {
   };
 
   const getPaymentBadge = (metodo) => {
-    const styles = {
-      efectivo: 'bg-green-100 text-green-700',
-      transferencia: 'bg-blue-100 text-blue-700',
-      tarjeta: 'bg-purple-100 text-purple-700'
+    const labels = {
+      efectivo: 'Efectivo',
+      transferencia: 'Transferencia',
+      tarjeta: 'Tarjeta',
     };
     return (
-      <span className={`px-2 py-1 rounded-sm text-xs font-medium uppercase ${styles[metodo] || 'bg-zinc-100 text-zinc-700'}`}>
-        {metodo}
+      <span className="px-2 py-0.5 rounded-sm text-xs font-medium uppercase tracking-wide bg-zinc-100 text-zinc-700">
+        {labels[metodo] || metodo}
       </span>
     );
   };

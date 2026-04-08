@@ -1,12 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { LayoutDashboard, Package, ShoppingCart, History, BarChart3, LogOut, Menu, X, User } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, History, BarChart3, LogOut, Menu, X, User, Users } from 'lucide-react';
 import { useState } from 'react';
 
 const allNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin'] },
   { to: '/productos', icon: Package, label: 'Productos', roles: ['admin'] },
+  { to: '/usuarios', icon: Users, label: 'Usuarios', roles: ['admin'] },
   { to: '/ventas', icon: ShoppingCart, label: 'Ventas', roles: ['admin', 'vendedor'] },
   { to: '/historial', icon: History, label: 'Historial', roles: ['admin'] },
   { to: '/reportes', icon: BarChart3, label: 'Reportes', roles: ['admin'] },

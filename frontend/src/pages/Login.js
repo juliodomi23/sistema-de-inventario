@@ -8,14 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Package, AlertCircle } from 'lucide-react';
 
 export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
-  const { login, register } = useAuth();
+
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -24,18 +22,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      let result;
-      if (isLogin) {
-        result = await login(email, password);
-      } else {
-        if (!name.trim()) {
-          setError('El nombre es requerido');
-          setIsLoading(false);
-          return;
-        }
-        result = await register(email, password, name);
-      }
-
+      const result = await login(email, password);
       if (result.success) {
         navigate('/');
       } else {
@@ -57,30 +44,11 @@ export default function Login() {
               <Package className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-heading">
-            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
-          </CardTitle>
-          <CardDescription>
-            Sistema de Inventario
-          </CardDescription>
+          <CardTitle className="text-2xl font-heading">Iniciar Sesión</CardTitle>
+          <CardDescription>Sistema de Inventario</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div className="form-group">
-                <Label htmlFor="name" className="form-label">Nombre</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Tu nombre"
-                  className="input-swiss"
-                  data-testid="register-name-input"
-                />
-              </div>
-            )}
-            
             <div className="form-group">
               <Label htmlFor="email" className="form-label">Correo electrónico</Label>
               <Input
@@ -116,28 +84,14 @@ export default function Login() {
               </div>
             )}
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full btn-primary"
               disabled={isLoading}
               data-testid="login-submit-button"
             >
-              {isLoading ? 'Cargando...' : (isLogin ? 'Entrar' : 'Registrarse')}
+              {isLoading ? 'Cargando...' : 'Entrar'}
             </Button>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setError('');
-                }}
-                className="text-sm text-zinc-600 hover:text-zinc-900 underline"
-                data-testid="toggle-auth-mode"
-              >
-                {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
-              </button>
-            </div>
           </form>
         </CardContent>
       </Card>

@@ -13,6 +13,24 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const COLORS = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444'];
 
+const formatCurrencyTooltip = (amount) =>
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(amount);
+
+function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-zinc-200 rounded-sm shadow-lg">
+        <p className="text-sm font-medium text-zinc-900">{label}</p>
+        <p className="text-sm text-emerald-600">{formatCurrencyTooltip(payload[0].value)}</p>
+        {payload[0].payload.count && (
+          <p className="text-xs text-zinc-500">{payload[0].payload.count} ventas</p>
+        )}
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function Reports() {
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -79,21 +97,6 @@ export default function Reports() {
       currency: 'MXN',
       minimumFractionDigits: 0
     }).format(amount);
-  };
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border border-zinc-200 rounded-sm shadow-lg">
-          <p className="text-sm font-medium text-zinc-900">{label}</p>
-          <p className="text-sm text-emerald-600">{formatCurrency(payload[0].value)}</p>
-          {payload[0].payload.count && (
-            <p className="text-xs text-zinc-500">{payload[0].payload.count} ventas</p>
-          )}
-        </div>
-      );
-    }
-    return null;
   };
 
   if (loading) {

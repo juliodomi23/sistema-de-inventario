@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Cabinet+Grotesk:wght@700;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -17,9 +17,10 @@ code {
 
 /* Custom heading font */
 .font-heading {
-    font-family: 'IBM Plex Sans', sans-serif;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-family: 'Cabinet Grotesk', 'IBM Plex Sans', sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
 }
 
 @layer base {
@@ -96,4 +97,33 @@ code {
     [data-debug-wrapper="true"] {
         display: contents !important;
     }
+}
+
+/* Clases de diseño faltantes */
+.metric-value {
+    @apply text-2xl font-semibold text-zinc-900 leading-none;
+}
+.metric-label {
+    @apply text-xs uppercase tracking-[0.1em] text-zinc-500 mt-1;
+}
+.form-group {
+    @apply space-y-1.5;
+}
+.form-label {
+    @apply text-xs font-medium uppercase tracking-[0.1em] text-zinc-500;
+}
+.status-badge {
+    @apply text-xs px-2 py-0.5 rounded-sm font-medium;
+}
+.empty-state {
+    @apply flex flex-col items-center justify-center text-zinc-400;
+}
+.nav-link {
+    @apply flex items-center px-3 py-2 text-sm text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-sm transition-colors;
+}
+.nav-link-active {
+    @apply flex items-center px-3 py-2 text-sm text-zinc-900 bg-zinc-100 rounded-sm font-medium;
+}
+.login-bg {
+    @apply bg-zinc-50;
 }
