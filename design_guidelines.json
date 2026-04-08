@@ -1,0 +1,120 @@
+{
+  "theme": "light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "typography": {
+    "headings": {
+      "font_family": "Cabinet Grotesk, sans-serif",
+      "weights": ["light", "bold", "black"],
+      "usage_rules": "Use tracking-tight for all headings. Never center unless required by layout symmetry. Keep line-height tight (leading-none)."
+    },
+    "body": {
+      "font_family": "IBM Plex Sans, sans-serif",
+      "weights": ["regular", "medium"],
+      "usage_rules": "Use for all tabular data, input fields, and regular text. Ensure high legibility."
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl",
+      "h3": "text-xl sm:text-2xl",
+      "h4": "text-lg sm:text-xl",
+      "body": "text-base",
+      "small": "text-sm",
+      "labels": "text-xs uppercase tracking-[0.2em]"
+    }
+  },
+  "colors": {
+    "background": {
+      "primary": "#FFFFFF",
+      "secondary": "#F4F4F5",
+      "tertiary": "#E4E4E7"
+    },
+    "text": {
+      "primary": "#09090B",
+      "secondary": "#52525B",
+      "inverse": "#FFFFFF"
+    },
+    "accents": {
+      "brand": "#09090B",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "danger": "#EF4444"
+    },
+    "stock_indicators": {
+      "high": "bg-emerald-500 text-white",
+      "medium": "bg-amber-500 text-black",
+      "low": "bg-rose-500 text-white"
+    },
+    "rules": "95% of the UI must be monochrome (White/Grey/Black). Use Green/Yellow/Red strictly for stock status indicators and critical actions to make them pop instantly against the structural greys."
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "Tailwind standard (p-2, p-4, p-6, p-8, p-12). Generous padding for all major containers.",
+    "dashboard_grid": {
+      "type": "Control Room Grid",
+      "columns": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4",
+      "gap": "gap-4 or gap-6",
+      "rules": "Strict hierarchy. High density. KPI summary cards span 1 column. Main data tables span full width or 3 columns. POS module spans full width."
+    },
+    "alignment": "Left-align dense content, tables, and labels. Center align only empty states or specific icons."
+  },
+  "surface_styles": {
+    "dashboard_cards": {
+      "style": "Grid Borders (Technical Look)",
+      "background": "bg-white",
+      "border": "border border-zinc-200",
+      "radius": "rounded-sm",
+      "shadow": "shadow-none",
+      "hover": "hover:border-zinc-300 transition-colors"
+    },
+    "header_nav": {
+      "style": "Solid Background",
+      "background": "bg-white",
+      "border": "border-b border-zinc-200"
+    }
+  },
+  "motion": {
+    "hover": "Subtle border and background shifts (e.g., bg-white to bg-zinc-50). Text color MUST remain high contrast.",
+    "transitions": "transition-all duration-200 ease-in-out",
+    "micro_interactions": "active:scale-[0.98] on primary buttons"
+  },
+  "components": {
+    "buttons": "Flat, sharp corners (rounded-sm). Primary: bg-zinc-950 text-zinc-50 hover:bg-zinc-900. No heavy shadows.",
+    "inputs": "Flat borders, bg-white, focus:ring-1 focus:ring-zinc-950 focus:border-zinc-950. No rounded full pills.",
+    "tables": "Shadcn Table. Flat, dense. Subtle border-b on rows. Header text uppercase tracking-wider text-xs.",
+    "badges": "Sharp (rounded-sm) not pill-shaped. Used for stock indicators.",
+    "icons": "Lucide React (technical, consistent stroke width 1.5)."
+  },
+  "image_urls": [
+    {
+      "url": "https://images.unsplash.com/photo-1586073055204-973f5b079e32?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxtaW5pbWFsJTIwYXJjaGl0ZWN0dXJlJTIwd2hpdGV8ZW58MHx8fHwxNzc1NjY2NDkwfDA&ixlib=rb-4.1.0&q=85",
+      "category": "login_background",
+      "description": "Minimalist white architecture, useful for a clean, structural login page background."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1773096324746-c08da58bc620?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjB3YXJlaG91c2UlMjBsb2dpc3RpY3N8ZW58MHx8fHwxNzc1NjY2NDkwfDA&ixlib=rb-4.1.0&q=85",
+      "category": "empty_state",
+      "description": "Clean white warehouse logistics background for empty states (e.g., no products found)."
+    }
+  ],
+  "data_testid_conventions": {
+    "rules": "All interactive and key informational elements MUST include data-testid. Use kebab-case and role-based naming.",
+    "examples": [
+      "login-form-submit-button",
+      "dashboard-total-sales-metric",
+      "product-table-edit-button",
+      "pos-add-to-cart-button",
+      "stock-status-indicator-green",
+      "stock-status-indicator-yellow",
+      "stock-status-indicator-red"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow this JSON schema for colors and typography.",
+    "Do not use generic SaaS blue. Keep it monochrome structural (zinc/black) with Green/Yellow/Red strictly for stock status.",
+    "Implement the 'Control Room' grid for the dashboard: high density, clear F-pattern hierarchy with Total Sales at top left.",
+    "Use Shadcn UI components but override border-radius to `rounded-sm` and remove drop shadows for a Brutalist/Swiss feel.",
+    "Do NOT use 'Inter' for headings. Use 'Cabinet Grotesk' via font-source or Google Fonts if unavailable, fallback to a strong geometric sans. Use 'IBM Plex Sans' for body.",
+    "Ensure the POS module (Ventas) allows rapid, dense data entry. Avoid excessive whitespace inside the cart table. The form should be quick and actionable.",
+    "Apply stock indicator styles explicitly according to requirements: Green (stock > min + 2), Yellow (min < stock <= min + 2), Red (stock <= min).",
+    "Include a dynamic change calculation mechanism in the POS when the 'efectivo' (cash) payment method is selected."
+  ]
+}
