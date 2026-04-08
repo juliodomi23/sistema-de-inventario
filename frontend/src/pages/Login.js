@@ -61,7 +61,7 @@ export default function Login() {
             {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           </CardTitle>
           <CardDescription>
-            Sistema de Inventario MVP
+            Sistema de Inventario
           </CardDescription>
         </CardHeader>
         <CardContent>
