@@ -42,17 +42,19 @@ Sistema de Inventario MVP - Aplicación web de inventario simple con gestión de
 - [x] Logs de cambios de stock
 - [x] Protección brute force en login
 - [x] Admin seeding automático
+- [x] **Anular/deshacer ventas con restauración automática de stock**
+- [x] **Historial de ventas con filtrado por estado**
 
 ### Test Results
-- Backend: 100% (17/17 tests)
-- Frontend: 95% (minor UX issue fixed)
+- Backend: 100%
+- Frontend: 95%
 
 ## Prioritized Backlog
 ### P0 (Critical) - Done
 - Todas las funcionalidades core implementadas
+- Anular ventas implementado
 
 ### P1 (High Priority)
-- [ ] Anular/deshacer ventas
 - [ ] Exportar reportes a CSV/PDF
 
 ### P2 (Medium Priority)
