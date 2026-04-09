@@ -30,7 +30,7 @@ services:
     build:
       context: ./frontend
       args:
-        - REACT_APP_BACKEND_URL=
+        - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
     restart: unless-stopped
     depends_on:
       - backend
