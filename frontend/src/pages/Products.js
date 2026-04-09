@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -29,10 +30,13 @@ const initialFormState = {
   unidad_medida: 'piezas',
   cantidad_stock: '',
   cantidad_minima: '',
+  codigo_barras: '',
+  categoria_id: '',
 };
 
 export default function Products() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState(initialFormState);
   const [editingId, setEditingId] = useState(null);
@@ -43,6 +47,7 @@ export default function Products() {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
 
   const fetchProducts = async () => {
@@ -59,6 +64,15 @@ export default function Products() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/api/categories');
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -66,6 +80,10 @@ export default function Products() {
 
   const handleSelectChange = (value) => {
     setFormData(prev => ({ ...prev, unidad_medida: value }));
+  };
+
+  const handleCategoryChange = (value) => {
+    setFormData(prev => ({ ...prev, categoria_id: value === '_none' ? '' : value }));
   };
 
   const resetForm = () => {
@@ -81,6 +99,8 @@ export default function Products() {
       unidad_medida: product.unidad_medida,
       cantidad_stock: product.cantidad_stock.toString(),
       cantidad_minima: product.cantidad_minima.toString(),
+      codigo_barras: product.codigo_barras || '',
+      categoria_id: product.categoria_id || '',
     });
     setEditingId(product.id);
     setIsDialogOpen(true);
@@ -104,6 +124,8 @@ export default function Products() {
       unidad_medida: formData.unidad_medida,
       cantidad_stock: parseFloat(formData.cantidad_stock),
       cantidad_minima: parseFloat(formData.cantidad_minima),
+      codigo_barras: formData.codigo_barras || null,
+      categoria_id: formData.categoria_id || null,
     };
 
     if (isNaN(payload.precio_unitario) || payload.precio_unitario <= 0) {
@@ -265,6 +287,35 @@ export default function Products() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="form-group">
+                  <Label htmlFor="codigo_barras" className="form-label">Código de barras</Label>
+                  <Input
+                    id="codigo_barras"
+                    name="codigo_barras"
+                    value={formData.codigo_barras}
+                    onChange={handleInputChange}
+                    placeholder="Opcional"
+                    className="input-swiss"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <Label htmlFor="categoria_id" className="form-label">Categoría</Label>
+                  <Select value={formData.categoria_id || '_none'} onValueChange={handleCategoryChange}>
+                    <SelectTrigger className="input-swiss">
+                      <SelectValue placeholder="Sin categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">Sin categoría</SelectItem>
+                      {categories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
                   <Label htmlFor="cantidad_stock" className="form-label">Stock Actual *</Label>
                   <Input
                     id="cantidad_stock"
@@ -327,6 +378,7 @@ export default function Products() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="table-header">Producto</TableHead>
+                  <TableHead className="table-header">Categoría</TableHead>
                   <TableHead className="table-header">Precio</TableHead>
                   <TableHead className="table-header">Stock</TableHead>
                   <TableHead className="table-header">Mínimo</TableHead>
@@ -341,7 +393,15 @@ export default function Products() {
                       <div>
                         <p className="text-zinc-900">{product.nombre}</p>
                         <p className="text-xs text-zinc-500">{product.unidad_medida}</p>
+                        {product.codigo_barras && (
+                          <p className="text-xs text-zinc-400 font-mono">{product.codigo_barras}</p>
+                        )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-zinc-600">
+                        {product.categoria_nombre || <span className="text-zinc-400">—</span>}
+                      </span>
                     </TableCell>
                     <TableCell>{formatCurrency(product.precio_unitario)}</TableCell>
                     <TableCell>{product.cantidad_stock}</TableCell>

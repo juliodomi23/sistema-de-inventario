@@ -9,6 +9,10 @@ import Sales from './pages/Sales';
 import SalesHistory from './pages/SalesHistory';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
+import Categories from './pages/Categories';
+import StockEntries from './pages/StockEntries';
+import CashRegister from './pages/CashRegister';
+import Customers from './pages/Customers';
 import './App.css';
 
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -128,6 +132,10 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/categorias" element={<ProtectedRoute allowedRoles={['admin']}><Categories /></ProtectedRoute>} />
+      <Route path="/entradas" element={<ProtectedRoute allowedRoles={['admin']}><StockEntries /></ProtectedRoute>} />
+      <Route path="/corte" element={<ProtectedRoute allowedRoles={['admin', 'vendedor']}><CashRegister /></ProtectedRoute>} />
+      <Route path="/clientes" element={<ProtectedRoute allowedRoles={['admin']}><Customers /></ProtectedRoute>} />
       <Route path="*" element={<DefaultRedirect />} />
     </Routes>
   );

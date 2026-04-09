@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { LayoutDashboard, Package, ShoppingCart, History, BarChart3, LogOut, Menu, X, User, Users } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, History, BarChart3, LogOut, Menu, X, User, Users, Tag, PackagePlus, Wallet, Users2 } from 'lucide-react';
 import { useState } from 'react';
 
 const allNavItems = [
@@ -11,6 +11,10 @@ const allNavItems = [
   { to: '/ventas', icon: ShoppingCart, label: 'Ventas', roles: ['admin', 'vendedor'] },
   { to: '/historial', icon: History, label: 'Historial', roles: ['admin'] },
   { to: '/reportes', icon: BarChart3, label: 'Reportes', roles: ['admin'] },
+  { to: '/categorias', icon: Tag, label: 'Categorías', roles: ['admin'] },
+  { to: '/entradas', icon: PackagePlus, label: 'Entradas', roles: ['admin'] },
+  { to: '/corte', icon: Wallet, label: 'Corte de Caja', roles: ['admin', 'vendedor'] },
+  { to: '/clientes', icon: Users2, label: 'Clientes', roles: ['admin'] },
 ];
 
 export default function Layout({ children }) {

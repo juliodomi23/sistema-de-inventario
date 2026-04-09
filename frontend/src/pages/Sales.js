@@ -1,12 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Label } from '../components/ui/label';
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, ArrowRightLeft, CheckCircle, AlertCircle, Package, Search } from 'lucide-react';
+import { formatCurrency, formatDate } from '../utils/format';
+import {
+  ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote,
+  ArrowRightLeft, CheckCircle, AlertCircle, Package, Search,
+  Scan, ChevronDown, ChevronUp, Clock, MessageCircle
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -15,12 +21,17 @@ const PAYMENT_METHODS = [
   { value: 'efectivo', label: 'Efectivo', icon: Banknote },
   { value: 'transferencia', label: 'Transferencia', icon: ArrowRightLeft },
   { value: 'tarjeta', label: 'Tarjeta', icon: CreditCard },
+  { value: 'fiado', label: 'Fiado', icon: Clock },
 ];
 
 export default function Sales() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [barcodeInput, setBarcodeInput] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
   const [cashReceived, setCashReceived] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,9 +41,30 @@ export default function Sales() {
   const [error, setError] = useState('');
   const [quantityModal, setQuantityModal] = useState({ open: false, product: null, quantity: 1 });
 
+  // Descuento
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [descuentoTipo, setDescuentoTipo] = useState(null);
+  const [descuentoValor, setDescuentoValor] = useState('');
+
+  // Fiado / cliente
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+
+  const barcodeRef = useRef(null);
+  const barcodeDebounceRef = useRef(null);
+
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
+    fetchCustomers();
   }, []);
+
+  useEffect(() => {
+    if (!loading && barcodeRef.current) {
+      barcodeRef.current.focus();
+    }
+  }, [loading]);
 
   const fetchProducts = async () => {
     try {
@@ -45,6 +77,24 @@ export default function Sales() {
       toast.error('Error al cargar productos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/api/categories');
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const response = await api.get('/api/customers');
+      setCustomers(response.data);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
     }
   };
 
@@ -66,26 +116,63 @@ export default function Sales() {
     return colors[status] || 'bg-zinc-300';
   };
 
-  const filteredProducts = products.filter(p => 
-    p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) &&
-    p.cantidad_stock > 0
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === null || p.categoria_id === selectedCategory;
+    return matchesSearch && matchesCategory && p.cantidad_stock > 0;
+  });
+
+  const handleBarcodeChange = (e) => {
+    const value = e.target.value;
+    setBarcodeInput(value);
+
+    if (barcodeDebounceRef.current) {
+      clearTimeout(barcodeDebounceRef.current);
+    }
+
+    if (value.length >= 3) {
+      barcodeDebounceRef.current = setTimeout(async () => {
+        await lookupBarcode(value);
+      }, 600);
+    }
+  };
+
+  const handleBarcodeKeyDown = async (e) => {
+    if (e.key === 'Enter' && barcodeInput.trim()) {
+      if (barcodeDebounceRef.current) {
+        clearTimeout(barcodeDebounceRef.current);
+      }
+      await lookupBarcode(barcodeInput.trim());
+    }
+  };
+
+  const lookupBarcode = async (code) => {
+    try {
+      const response = await api.get(`/api/products/barcode/${code}`);
+      const product = response.data;
+      quickAddToCart(product);
+      setBarcodeInput('');
+    } catch (error) {
+      toast.error('Código de barras no encontrado');
+      setBarcodeInput('');
+    }
+  };
 
   const openQuantityModal = (product) => {
     const existingItem = cart.find(item => item.producto_id === product.id);
     const currentInCart = existingItem ? existingItem.cantidad : 0;
     const maxAvailable = product.cantidad_stock - currentInCart;
-    
+
     if (maxAvailable <= 0) {
       toast.error('No hay más stock disponible');
       return;
     }
-    
-    setQuantityModal({ 
-      open: true, 
-      product, 
+
+    setQuantityModal({
+      open: true,
+      product,
       quantity: 1,
-      maxAvailable 
+      maxAvailable
     });
   };
 
@@ -103,7 +190,7 @@ export default function Sales() {
     }
 
     if (existingItem) {
-      setCart(cart.map(item => 
+      setCart(cart.map(item =>
         item.producto_id === product.id
           ? { ...item, cantidad: newTotalQuantity, subtotal: product.precio_unitario * newTotalQuantity }
           : item
@@ -134,7 +221,7 @@ export default function Sales() {
     }
 
     if (existingItem) {
-      setCart(cart.map(item => 
+      setCart(cart.map(item =>
         item.producto_id === product.id
           ? { ...item, cantidad: currentQuantity + 1, subtotal: product.precio_unitario * (currentQuantity + 1) }
           : item
@@ -182,10 +269,29 @@ export default function Sales() {
     setCart([]);
     setCashReceived('');
     setError('');
+    setDescuentoTipo(null);
+    setDescuentoValor('');
+    setShowDiscount(false);
+    setSelectedCustomer(null);
+    setCustomerSearch('');
+  };
+
+  const getSubtotal = () => {
+    return cart.reduce((sum, item) => sum + item.subtotal, 0);
+  };
+
+  const getDescuentoMonto = () => {
+    const subtotal = getSubtotal();
+    if (!descuentoTipo || !descuentoValor) return 0;
+    const valor = parseFloat(descuentoValor) || 0;
+    if (descuentoTipo === 'porcentaje') {
+      return (subtotal * valor) / 100;
+    }
+    return Math.min(valor, subtotal);
   };
 
   const getTotal = () => {
-    return cart.reduce((sum, item) => sum + item.subtotal, 0);
+    return Math.max(0, getSubtotal() - getDescuentoMonto());
   };
 
   const getChange = () => {
@@ -193,6 +299,30 @@ export default function Sales() {
     const cash = parseFloat(cashReceived) || 0;
     const total = getTotal();
     return cash >= total ? cash - total : null;
+  };
+
+  const filteredCustomers = customers.filter(c =>
+    c.nombre.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    (c.telefono && c.telefono.includes(customerSearch))
+  );
+
+  const buildWhatsAppLink = (sale, customer) => {
+    const phone = customer?.telefono?.replace(/\D/g, '');
+    if (!phone) return null;
+    const lines = [
+      '🧾 *Recibo de Venta*',
+      `Fecha: ${formatDate(sale.fecha_venta)}`,
+      '',
+      ...sale.items.map(item => `• ${item.producto_nombre} x${item.cantidad_vendida} — ${formatCurrency(item.subtotal)}`),
+      '',
+      sale.monto_descuento > 0 ? `Subtotal: ${formatCurrency(sale.monto_subtotal)}` : '',
+      sale.monto_descuento > 0 ? `Descuento: -${formatCurrency(sale.monto_descuento)}` : '',
+      `*Total: ${formatCurrency(sale.monto_total)}*`,
+      `Pago: ${sale.metodo_pago}`,
+      sale.cambio != null ? `Cambio: ${formatCurrency(sale.cambio)}` : ''
+    ].filter(Boolean);
+    const text = encodeURIComponent(lines.join('\n'));
+    return `https://wa.me/${phone}?text=${text}`;
   };
 
   const completeSale = async () => {
@@ -211,6 +341,11 @@ export default function Sales() {
       }
     }
 
+    if (paymentMethod === 'fiado' && !selectedCustomer) {
+      setError('Debes seleccionar un cliente para ventas a crédito');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -220,18 +355,29 @@ export default function Sales() {
           cantidad: item.cantidad
         })),
         metodo_pago: paymentMethod,
-        monto_recibido: paymentMethod === 'efectivo' ? parseFloat(cashReceived) : null
+        monto_recibido: paymentMethod === 'efectivo' ? parseFloat(cashReceived) : null,
+        cliente_id: selectedCustomer?.id || null,
+        descuento_tipo: descuentoTipo || null,
+        descuento_valor: descuentoTipo && descuentoValor ? parseFloat(descuentoValor) : null,
       };
 
       const response = await axios.post(`${API_URL}/api/sales`, payload, {
         withCredentials: true
       });
 
-      setLastSale(response.data);
+      const saleData = response.data;
+      saleData.clienteRef = selectedCustomer;
+
+      setLastSale(saleData);
       setShowReceipt(true);
       setCart([]);
       setCashReceived('');
       setPaymentMethod('efectivo');
+      setDescuentoTipo(null);
+      setDescuentoValor('');
+      setShowDiscount(false);
+      setSelectedCustomer(null);
+      setCustomerSearch('');
       fetchProducts();
       toast.success('Venta completada');
     } catch (error) {
@@ -241,20 +387,6 @@ export default function Sales() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN'
-    }).format(amount);
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('es-MX', {
-      dateStyle: 'long',
-      timeStyle: 'short'
-    });
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64" data-testid="sales-loading">
@@ -262,6 +394,17 @@ export default function Sales() {
       </div>
     );
   }
+
+  const descuentoMonto = getDescuentoMonto();
+  const subtotal = getSubtotal();
+  const total = getTotal();
+  const creditoDisponible = selectedCustomer
+    ? (selectedCustomer.limite_credito > 0
+        ? selectedCustomer.limite_credito - selectedCustomer.saldo_pendiente
+        : null)
+    : null;
+  const excedeCreditro = selectedCustomer && selectedCustomer.limite_credito > 0
+    && (selectedCustomer.saldo_pendiente + total) > selectedCustomer.limite_credito;
 
   return (
     <div className="space-y-4" data-testid="sales-container">
@@ -280,6 +423,20 @@ export default function Sales() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products Grid */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Barcode Input */}
+          <div className="relative">
+            <Scan className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <Input
+              ref={barcodeRef}
+              type="text"
+              placeholder="Escanear código de barras..."
+              value={barcodeInput}
+              onChange={handleBarcodeChange}
+              onKeyDown={handleBarcodeKeyDown}
+              className="pl-10 input-swiss"
+            />
+          </div>
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-400" />
@@ -293,6 +450,35 @@ export default function Sales() {
             />
           </div>
 
+          {/* Category Tabs */}
+          {categories.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`px-3 py-1 text-sm rounded-sm border transition-all ${
+                  selectedCategory === null
+                    ? 'bg-zinc-900 text-white border-zinc-900'
+                    : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+                }`}
+              >
+                Todos
+              </button>
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                  className={`px-3 py-1 text-sm rounded-sm border transition-all ${
+                    selectedCategory === cat.id
+                      ? 'bg-zinc-900 text-white border-zinc-900'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+                  }`}
+                >
+                  {cat.nombre}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Product Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3" data-testid="products-grid">
             {filteredProducts.map((product) => {
@@ -305,10 +491,8 @@ export default function Sales() {
                   onContextMenu={(e) => { e.preventDefault(); openQuantityModal(product); }}
                   data-testid={`product-card-${product.id}`}
                 >
-                  {/* Stock indicator dot */}
                   <div className={`absolute top-2 right-2 w-3 h-3 rounded-full ${getStockBadgeColor(product.stock_status)}`} />
-                  
-                  {/* In cart badge */}
+
                   {inCart && (
                     <div className="absolute -top-2 -left-2 w-6 h-6 bg-zinc-900 text-white rounded-full flex items-center justify-center text-xs font-bold">
                       {inCart.cantidad}
@@ -398,9 +582,80 @@ export default function Sales() {
                       <p className="text-sm font-semibold w-20 text-right">{formatCurrency(item.subtotal)}</p>
                     </div>
                   ))}
-                  <div className="border-t border-zinc-200 pt-3 mt-3 flex justify-between text-lg font-bold">
-                    <span>Total:</span>
-                    <span data-testid="cart-total">{formatCurrency(getTotal())}</span>
+
+                  <div className="border-t border-zinc-200 pt-3 mt-3">
+                    {descuentoMonto > 0 && (
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-zinc-500">Subtotal:</span>
+                        <span>{formatCurrency(subtotal)}</span>
+                      </div>
+                    )}
+                    {descuentoMonto > 0 && (
+                      <div className="flex justify-between text-sm mb-1 text-rose-600">
+                        <span>Descuento:</span>
+                        <span>-{formatCurrency(descuentoMonto)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>Total:</span>
+                      <span data-testid="cart-total">{formatCurrency(total)}</span>
+                    </div>
+                  </div>
+
+                  {/* Descuento Section */}
+                  <div className="border-t border-zinc-100 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscount(!showDiscount)}
+                      className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 w-full"
+                    >
+                      {showDiscount ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      Descuento
+                    </button>
+                    {showDiscount && (
+                      <div className="mt-2 space-y-2 p-2 bg-zinc-50 rounded-sm">
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                            <input
+                              type="radio"
+                              name="descuentoTipo"
+                              value="porcentaje"
+                              checked={descuentoTipo === 'porcentaje'}
+                              onChange={() => setDescuentoTipo('porcentaje')}
+                              className="accent-zinc-900"
+                            />
+                            Porcentaje %
+                          </label>
+                          <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                            <input
+                              type="radio"
+                              name="descuentoTipo"
+                              value="monto_fijo"
+                              checked={descuentoTipo === 'monto_fijo'}
+                              onChange={() => setDescuentoTipo('monto_fijo')}
+                              className="accent-zinc-900"
+                            />
+                            Monto fijo $
+                          </label>
+                        </div>
+                        {descuentoTipo && (
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={descuentoValor}
+                            onChange={(e) => setDescuentoValor(e.target.value)}
+                            placeholder={descuentoTipo === 'porcentaje' ? '0 %' : '0.00'}
+                            className="input-swiss h-8 text-sm"
+                          />
+                        )}
+                        {descuentoMonto > 0 && (
+                          <p className="text-xs text-rose-600">
+                            Descuento: -{formatCurrency(descuentoMonto)} → Total: {formatCurrency(total)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -419,7 +674,7 @@ export default function Sales() {
                 <CardTitle className="text-lg font-heading">Pago</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid grid-cols-3 gap-2">
+                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid grid-cols-2 gap-2">
                   {PAYMENT_METHODS.map((method) => (
                     <div key={method.value}>
                       <RadioGroupItem
@@ -443,7 +698,7 @@ export default function Sales() {
                   <div className="space-y-3 p-3 bg-zinc-50 rounded-sm">
                     <div className="flex justify-between text-sm">
                       <span className="text-zinc-500">Total:</span>
-                      <span className="font-bold">{formatCurrency(getTotal())}</span>
+                      <span className="font-bold">{formatCurrency(total)}</span>
                     </div>
                     <div>
                       <Label className="text-xs text-zinc-500">Monto Recibido</Label>
@@ -469,6 +724,67 @@ export default function Sales() {
                   </div>
                 )}
 
+                {paymentMethod === 'fiado' && (
+                  <div className="space-y-2 p-3 bg-zinc-50 rounded-sm">
+                    <Label className="text-xs text-zinc-500">Buscar cliente</Label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={customerSearch}
+                        onChange={(e) => {
+                          setCustomerSearch(e.target.value);
+                          setShowCustomerDropdown(true);
+                          if (!e.target.value) setSelectedCustomer(null);
+                        }}
+                        onFocus={() => setShowCustomerDropdown(true)}
+                        placeholder="Nombre o teléfono..."
+                        className="input-swiss h-8 text-sm"
+                      />
+                      {showCustomerDropdown && customerSearch && filteredCustomers.length > 0 && (
+                        <div className="absolute z-10 top-full left-0 right-0 bg-white border border-zinc-200 rounded-sm shadow-md max-h-40 overflow-y-auto">
+                          {filteredCustomers.map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCustomer(c);
+                                setCustomerSearch(c.nombre);
+                                setShowCustomerDropdown(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 border-b border-zinc-100 last:border-0"
+                            >
+                              <span className="font-medium">{c.nombre}</span>
+                              {c.telefono && <span className="text-zinc-400 ml-2">{c.telefono}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {selectedCustomer && (
+                      <div className="text-xs space-y-1 mt-1">
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500">Saldo pendiente:</span>
+                          <span className={selectedCustomer.saldo_pendiente > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600'}>
+                            {formatCurrency(selectedCustomer.saldo_pendiente)}
+                          </span>
+                        </div>
+                        {selectedCustomer.limite_credito > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-zinc-500">Límite de crédito:</span>
+                            <span>{formatCurrency(selectedCustomer.limite_credito)}</span>
+                          </div>
+                        )}
+                        {excedeCreditro && (
+                          <div className="flex items-center gap-1 text-rose-600 bg-rose-50 p-2 rounded-sm">
+                            <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                            <span>Esta venta excede el límite de crédito del cliente</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {error && (
                   <div className="flex items-center gap-2 text-rose-600 text-sm bg-rose-50 p-3 rounded-sm" data-testid="sale-error">
                     <AlertCircle className="h-4 w-4" />
@@ -482,7 +798,7 @@ export default function Sales() {
                   className="btn-primary w-full py-5 text-base"
                   data-testid="complete-sale-button"
                 >
-                  {isProcessing ? 'Procesando...' : `Cobrar ${formatCurrency(getTotal())}`}
+                  {isProcessing ? 'Procesando...' : `Cobrar ${formatCurrency(total)}`}
                 </Button>
               </CardContent>
             </Card>
@@ -517,8 +833,8 @@ export default function Sales() {
                 min="1"
                 max={quantityModal.maxAvailable}
                 value={quantityModal.quantity}
-                onChange={(e) => setQuantityModal(prev => ({ 
-                  ...prev, 
+                onChange={(e) => setQuantityModal(prev => ({
+                  ...prev,
                   quantity: Math.min(prev.maxAvailable, Math.max(1, parseInt(e.target.value) || 1))
                 }))}
                 className="w-20 text-center text-xl font-bold input-swiss"
@@ -527,9 +843,9 @@ export default function Sales() {
                 variant="outline"
                 size="lg"
                 className="h-12 w-12 p-0"
-                onClick={() => setQuantityModal(prev => ({ 
-                  ...prev, 
-                  quantity: Math.min(prev.maxAvailable, prev.quantity + 1) 
+                onClick={() => setQuantityModal(prev => ({
+                  ...prev,
+                  quantity: Math.min(prev.maxAvailable, prev.quantity + 1)
                 }))}
               >
                 <Plus className="h-5 w-5" />
@@ -559,6 +875,9 @@ export default function Sales() {
               <div className="text-center py-4 border-b border-zinc-100">
                 <p className="text-3xl font-bold text-zinc-900">{formatCurrency(lastSale.monto_total)}</p>
                 <p className="text-sm text-zinc-500 mt-1">{formatDate(lastSale.fecha_venta)}</p>
+                {lastSale.clienteRef && (
+                  <p className="text-sm text-zinc-600 mt-1">{lastSale.clienteRef.nombre}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -571,6 +890,18 @@ export default function Sales() {
               </div>
 
               <div className="border-t border-zinc-200 pt-4 space-y-2">
+                {lastSale.monto_descuento > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(lastSale.monto_subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-rose-600">
+                      <span>Descuento:</span>
+                      <span>-{formatCurrency(lastSale.monto_descuento)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-500">Método de Pago:</span>
                   <span className="capitalize">{lastSale.metodo_pago}</span>
@@ -583,9 +914,24 @@ export default function Sales() {
                 )}
               </div>
 
-              <Button onClick={() => setShowReceipt(false)} className="btn-primary w-full">
-                Nueva Venta
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => setShowReceipt(false)} className="btn-primary flex-1">
+                  Nueva Venta
+                </Button>
+                {(() => {
+                  const waLink = buildWhatsAppLink(lastSale, lastSale.clienteRef);
+                  return waLink ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(waLink, '_blank')}
+                      className="flex items-center gap-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </Button>
+                  ) : null;
+                })()}
+              </div>
             </div>
           )}
         </DialogContent>
