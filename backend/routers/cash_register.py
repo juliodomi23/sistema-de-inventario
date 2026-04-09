@@ -93,11 +93,30 @@ async def get_current_cash_register(user: dict = Depends(require_seller_or_admin
     register = await db.cash_registers.find_one({"estado": "abierto"})
     if not register:
         return None
+
+    # Calculate live sales since opening
+    apertura = register["fecha_apertura"]
+    now = datetime.now(timezone.utc)
+
+    cash_pipeline = [
+        {"$match": {"fecha_venta": {"$gte": apertura, "$lte": now}, "metodo_pago": "efectivo", "estado": {"$ne": "anulada"}}},
+        {"$group": {"_id": None, "total": {"$sum": "$monto_total"}}}
+    ]
+    cash_result = await db.sales.aggregate(cash_pipeline).to_list(1)
+    ventas_efectivo = round(cash_result[0]["total"] if cash_result else 0.0, 2)
+
+    total_pipeline = [
+        {"$match": {"fecha_venta": {"$gte": apertura, "$lte": now}, "estado": {"$ne": "anulada"}}},
+        {"$group": {"_id": None, "total": {"$sum": "$monto_total"}}}
+    ]
+    total_result = await db.sales.aggregate(total_pipeline).to_list(1)
+    ventas_total = round(total_result[0]["total"] if total_result else 0.0, 2)
+
     return CashRegisterResponse(
         id=str(register["_id"]), estado=register["estado"], monto_inicial=register["monto_inicial"],
         monto_contado=register.get("monto_contado"), monto_esperado=register.get("monto_esperado"),
-        diferencia=register.get("diferencia"), ventas_efectivo=register.get("ventas_efectivo", 0.0),
-        ventas_total=register.get("ventas_total", 0.0), notas_apertura=register.get("notas_apertura"),
+        diferencia=register.get("diferencia"), ventas_efectivo=ventas_efectivo,
+        ventas_total=ventas_total, notas_apertura=register.get("notas_apertura"),
         notas_cierre=register.get("notas_cierre"), usuario_id=register["usuario_id"],
         usuario_nombre=register["usuario_nombre"], fecha_apertura=register["fecha_apertura"],
         fecha_cierre=register.get("fecha_cierre")
@@ -105,7 +124,7 @@ async def get_current_cash_register(user: dict = Depends(require_seller_or_admin
 
 
 @router.get("", response_model=List[CashRegisterResponse])
-async def list_cash_registers(limit: int = 30, user: dict = Depends(require_admin)):
+async def list_cash_registers(limit: int = 30, user: dict = Depends(require_seller_or_admin)):
     registers = await db.cash_registers.find({}).sort("fecha_apertura", -1).limit(limit).to_list(limit)
     return [
         CashRegisterResponse(

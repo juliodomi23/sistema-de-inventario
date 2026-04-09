@@ -146,29 +146,32 @@ export default function CashRegister() {
             <Badge className="bg-emerald-500 text-white hover:bg-emerald-600">ABIERTO</Badge>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
               <div>
                 <p className="text-xs text-zinc-500">Monto inicial</p>
                 <p className="text-lg font-bold text-zinc-900">{formatCurrency(currentRegister.monto_inicial)}</p>
               </div>
               <div>
-                <p className="text-xs text-zinc-500">Ventas en efectivo</p>
-                <p className="text-lg font-bold text-zinc-900">{formatCurrency(currentRegister.ventas_efectivo || 0)}</p>
+                <p className="text-xs text-zinc-500">Ventas efectivo</p>
+                <p className="text-lg font-bold text-emerald-700">{formatCurrency(currentRegister.ventas_efectivo || 0)}</p>
               </div>
               <div>
-                <p className="text-xs text-zinc-500">Monto esperado</p>
+                <p className="text-xs text-zinc-500">Otras ventas</p>
                 <p className="text-lg font-bold text-zinc-900">
-                  {formatCurrency((currentRegister.monto_inicial || 0) + (currentRegister.ventas_efectivo || 0))}
+                  {formatCurrency((currentRegister.ventas_total || 0) - (currentRegister.ventas_efectivo || 0))}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-zinc-500">Apertura</p>
-                <p className="text-sm text-zinc-700">{formatDate(currentRegister.fecha_apertura)}</p>
+                <p className="text-xs text-zinc-500">Esperado en caja</p>
+                <p className="text-lg font-bold text-blue-700">
+                  {formatCurrency((currentRegister.monto_inicial || 0) + (currentRegister.ventas_efectivo || 0))}
+                </p>
               </div>
-              <div>
-                <p className="text-xs text-zinc-500">Usuario</p>
-                <p className="text-sm text-zinc-700">{currentRegister.usuario_nombre || '—'}</p>
-              </div>
+            </div>
+            <div className="flex gap-4 text-xs text-zinc-400 mb-6">
+              <span>Apertura: {formatDate(currentRegister.fecha_apertura)}</span>
+              <span>·</span>
+              <span>{currentRegister.usuario_nombre}</span>
             </div>
             <Button
               onClick={() => setShowCloseDialog(true)}
@@ -313,10 +316,23 @@ export default function CashRegister() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             {currentRegister && (
-              <div className="p-3 bg-zinc-50 rounded-sm text-sm space-y-1">
+              <div className="p-3 bg-zinc-50 rounded-sm text-sm space-y-2 border border-zinc-200">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">Resumen del turno</p>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Monto esperado:</span>
-                  <span className="font-medium">
+                  <span className="text-zinc-500">Monto inicial:</span>
+                  <span className="font-medium">{formatCurrency(currentRegister.monto_inicial)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Ventas en efectivo:</span>
+                  <span className="font-medium text-emerald-700">{formatCurrency(currentRegister.ventas_efectivo || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Otras ventas (tarjeta/transfer/fiado):</span>
+                  <span className="font-medium">{formatCurrency((currentRegister.ventas_total || 0) - (currentRegister.ventas_efectivo || 0))}</span>
+                </div>
+                <div className="flex justify-between border-t border-zinc-200 pt-2 mt-1">
+                  <span className="text-zinc-700 font-semibold">Esperado en caja:</span>
+                  <span className="font-bold text-blue-700">
                     {formatCurrency((currentRegister.monto_inicial || 0) + (currentRegister.ventas_efectivo || 0))}
                   </span>
                 </div>
