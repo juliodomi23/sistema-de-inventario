@@ -401,7 +401,7 @@ async def create_product(product: ProductCreate, user: dict = Depends(require_ad
     )
 
 @api_router.get("/products", response_model=List[ProductResponse])
-async def list_products(user: dict = Depends(require_admin)):
+async def list_products(user: dict = Depends(require_seller_or_admin)):
     
     products = await db.products.find({}).to_list(1000)
     return [
@@ -419,7 +419,7 @@ async def list_products(user: dict = Depends(require_admin)):
     ]
 
 @api_router.get("/products/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: str, user: dict = Depends(require_admin)):
+async def get_product(product_id: str, user: dict = Depends(require_seller_or_admin)):
     product = await db.products.find_one({"_id": parse_object_id(product_id)})
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")

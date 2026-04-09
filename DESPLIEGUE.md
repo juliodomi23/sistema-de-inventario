@@ -6,7 +6,7 @@
 ## Requisitos previos
 
 - Servidor con EasyPanel instalado
-- Git instalado en el servidor (o acceso por repositorio remoto)
+- Repositorio Git (GitHub, GitLab, etc.)
 - Dominio apuntando al servidor (opcional pero recomendado)
 
 ---
@@ -19,13 +19,11 @@ En cualquier terminal con Python instalado:
 python -c "import secrets; print(secrets.token_hex(64))"
 ```
 
-Copia el resultado. Lo necesitarás en el Paso 3.
+Copia el resultado. Lo necesitarás en el Paso 4.
 
 ---
 
 ## Paso 2 — Subir el proyecto a un repositorio Git
-
-Si aún no tienes el proyecto en GitHub/GitLab:
 
 ```bash
 git init
@@ -43,80 +41,66 @@ git push -u origin main
 2. Dale un nombre (ej. `inventario-cliente`)
 3. Dentro del proyecto → **+ New Service** → **App**
 4. Selecciona **Docker Compose**
-5. Conecta tu repositorio Git o pega el contenido del `docker-compose.yml`
+5. Conecta tu repositorio Git
 
 ---
 
-## Paso 4 — Configurar variables de entorno del backend
+## Paso 4 — Configurar variables de entorno
 
-En EasyPanel, dentro del servicio `backend`, ve a **Environment**:
+En EasyPanel, en la sección **Environment** del proyecto o del servicio correspondiente, agrega todas estas variables:
 
-| Variable | Valor |
-|---|---|
-| `JWT_SECRET` | El string generado en el Paso 1 |
-| `DB_NAME` | `inventario` (o el nombre que prefieras) |
-| `ADMIN_EMAIL` | Email del administrador |
-| `ADMIN_PASSWORD` | Contraseña segura para el admin (mín. 8 chars) |
-| `VENDEDOR_EMAIL` | Email del vendedor inicial |
-| `VENDEDOR_PASSWORD` | Contraseña segura para el vendedor |
-| `ALLOWED_ORIGINS` | URL pública del frontend (ej. `https://inventario.tudominio.com`) |
-| `ENVIRONMENT` | `production` |
+| Variable | Dónde | Valor |
+|---|---|---|
+| `JWT_SECRET` | backend | El string generado en el Paso 1 |
+| `DB_NAME` | backend | `inventario` |
+| `ADMIN_EMAIL` | backend | Email del administrador |
+| `ADMIN_PASSWORD` | backend | Contraseña segura (mín. 8 chars) |
+| `VENDEDOR_EMAIL` | backend | Email del vendedor inicial |
+| `VENDEDOR_PASSWORD` | backend | Contraseña segura (mín. 8 chars) |
+| `ALLOWED_ORIGINS` | backend | URL pública del frontend (ej. `https://inventario.tudominio.com`) |
+| `REACT_APP_BACKEND_URL` | frontend | URL pública del frontend (la misma, ej. `https://inventario.tudominio.com`) |
 
-> ⚠️ **IMPORTANTE:** `ADMIN_PASSWORD` y `VENDEDOR_PASSWORD` deben ser contraseñas seguras, no `admin123`. El sistema crea estos usuarios automáticamente al arrancar si no existen.
+> ⚠️ `ADMIN_PASSWORD` y `VENDEDOR_PASSWORD` deben ser contraseñas seguras. El sistema crea estos usuarios automáticamente al arrancar por primera vez.
 
----
+> ℹ️ `REACT_APP_BACKEND_URL` se configura como variable de entorno normal en EasyPanel (no como build arg). El `docker-compose.yml` la toma automáticamente con `${REACT_APP_BACKEND_URL}` y la pasa al build de React.
 
-## Paso 5 — Configurar el build arg del frontend
-
-En EasyPanel, dentro del servicio `frontend`, ve a **Build Arguments**:
-
-| Build Arg | Valor |
-|---|---|
-| `REACT_APP_BACKEND_URL` | URL pública del backend (ej. `https://api.inventario.tudominio.com`) |
-
-> Esta URL se incrusta en el build de React. Si la cambias, necesitas hacer rebuild del frontend.
+> ℹ️ `REACT_APP_BACKEND_URL` y `ALLOWED_ORIGINS` apuntan a la **URL del frontend** porque nginx hace el proxy de `/api/` al backend internamente — no necesitas exponer el backend al exterior.
 
 ---
 
-## Paso 6 — Configurar dominios
+## Paso 5 — Configurar el dominio y puerto del frontend
 
-En EasyPanel, para cada servicio configura el dominio:
+En EasyPanel, dentro del servicio `frontend`:
 
-- **frontend** → `inventario.tudominio.com` (puerto 80)
-- **backend** → `api.inventario.tudominio.com` (puerto 8000) — opcional si usas el proxy de nginx
+1. Ve a **Domains**
+2. Agrega tu dominio (ej. `inventario.tudominio.com`)
+3. En el campo **Port** pon `80`
 
-> Si prefieres usar un solo dominio, el `nginx.conf` del frontend ya hace proxy de `/api/` al backend interno. En ese caso solo necesitas exponer el frontend y no necesitas dominio público para el backend.
-
-**Configuración con un solo dominio (recomendado):**
-- **frontend** → `inventario.tudominio.com` (puerto 80)
-- El backend NO necesita dominio público, solo está en la red interna de Docker
-- En `REACT_APP_BACKEND_URL` puedes dejar vacío (el nginx lo maneja internamente)
+El backend y mongo **no necesitan dominio público** — nginx los conecta internamente.
 
 ---
 
-## Paso 7 — Primer deploy
+## Paso 6 — Deploy
 
-1. En EasyPanel haz clic en **Deploy**
+1. Haz clic en **Deploy**
 2. Espera que los tres servicios estén en verde: `mongo`, `backend`, `frontend`
-3. Verifica el health del backend:
+3. Verifica que el backend responde abriendo en el navegador:
    ```
-   GET https://api.inventario.tudominio.com/api/health
+   https://inventario.tudominio.com/api/health
    ```
    Debe responder: `{"status": "ok", "db": "connected"}`
 
 ---
 
-## Paso 8 — Primer acceso
+## Paso 7 — Primer acceso
 
-Al arrancar por primera vez, el backend crea automáticamente:
-- El usuario admin con las credenciales de `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-- El usuario vendedor con las credenciales de `VENDEDOR_EMAIL` / `VENDEDOR_PASSWORD`
+Al arrancar por primera vez el backend crea automáticamente el admin y el vendedor con las credenciales que configuraste.
 
 Entra a `https://inventario.tudominio.com` e inicia sesión como admin.
 
 ---
 
-## Paso 9 — Crear usuarios adicionales
+## Paso 8 — Crear usuarios adicionales
 
 El registro público está desactivado. Los usuarios se crean desde el panel:
 
@@ -129,28 +113,32 @@ El registro público está desactivado. Los usuarios se crean desde el panel:
 
 ## Actualizaciones futuras
 
-Para actualizar el sistema con nuevos cambios de código:
-
 1. Haz push de los cambios al repositorio
-2. En EasyPanel → **Deploy** (o activa auto-deploy desde el repo)
+2. En EasyPanel → **Deploy**
 
-> Si cambiaste variables de entorno del backend, solo necesitas reiniciar ese servicio. Si cambiaste `REACT_APP_BACKEND_URL`, necesitas rebuild del frontend.
+> Si cambiaste variables de entorno del backend, solo reinicia ese servicio. Si cambiaste `REACT_APP_BACKEND_URL`, necesitas rebuild completo del frontend.
 
 ---
 
 ## Solución de problemas
 
-**El backend no arranca:**
-- Verifica que `JWT_SECRET` esté configurado en las variables de entorno
-- Revisa los logs en EasyPanel → servicio `backend` → **Logs**
+**"Servicio no se puede alcanzar" en el frontend:**
+- Ve al servicio `frontend` → **Domains** → verifica que el puerto sea `80`
 
-**El frontend no conecta con el backend:**
-- Verifica que `ALLOWED_ORIGINS` en el backend incluya la URL exacta del frontend (con https, sin barra final)
-- Si usas un solo dominio, verifica que `nginx.conf` esté en `frontend/nginx.conf`
+**`REACT_APP_BACKEND_URL no está definida`:**
+- Asegúrate de haber agregado `REACT_APP_BACKEND_URL` en las variables de entorno de EasyPanel
+- Haz rebuild completo (es una variable de build time, se incrusta en el bundle de React)
+
+**El backend no arranca:**
+- Verifica que `JWT_SECRET` esté configurado
+- Revisa los logs: EasyPanel → servicio `backend` → **Logs**
+
+**Error de CORS en el navegador:**
+- Verifica que `ALLOWED_ORIGINS` tenga la URL exacta del frontend (con `https://`, sin `/` al final)
 
 **La base de datos no persiste entre reinicios:**
-- El volumen `mongo_data` en `docker-compose.yml` persiste los datos automáticamente en EasyPanel
+- El volumen `mongo_data` en `docker-compose.yml` persiste los datos automáticamente
 
 **Error 403 en endpoints:**
 - Asegúrate de que el usuario tenga el rol correcto (`admin` o `vendedor`)
-- Verifica que estés autenticado (cookie de sesión activa)
+- Verifica que estés autenticado (la sesión no haya expirado)
