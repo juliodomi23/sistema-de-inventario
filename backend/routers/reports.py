@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -353,6 +354,117 @@ async def get_statistics(
             {"name": p["_id"], "cantidad": p["cantidad_total"], "ingresos": round(p["ingresos"], 2)}
             for p in top_products
         ],
+        "period": {
+            "start": start_date.strftime("%Y-%m-%d"),
+            "end": end_date.strftime("%Y-%m-%d"),
+            "days": days
+        }
+    }
+
+
+@router.get("/profitability")
+async def get_profitability(
+    days: int = Query(7, description="Número de días"),
+    user: dict = Depends(require_admin)
+):
+    """Reporte de rentabilidad: ingresos, costos estimados y ganancia bruta."""
+
+    end_date = datetime.now(timezone.utc).replace(hour=23, minute=59, second=59)
+    start_date = (end_date - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0)
+
+    # Fetch sales in period
+    sales = await db.sales.find({
+        "fecha_venta": {"$gte": start_date, "$lte": end_date},
+        "estado": {"$ne": "anulada"}
+    }).to_list(5000)
+
+    # Fetch all products for cost lookup
+    products_raw = await db.products.find({}, {"costo": 1}).to_list(2000)
+    cost_map = {str(p["_id"]): p.get("costo") for p in products_raw}
+
+    # Aggregate per day and per product
+    daily = defaultdict(lambda: {"ingresos": 0.0, "costos": 0.0, "items_sin_costo": 0})
+    product_stats = defaultdict(lambda: {"ingresos": 0.0, "costos": 0.0, "cantidad": 0, "tiene_costo": False})
+
+    total_ingresos = 0.0
+    total_costos = 0.0
+    items_con_costo = 0
+    items_total = 0
+
+    for sale in sales:
+        day_key = sale["fecha_venta"].strftime("%Y-%m-%d")
+        for item in sale.get("items", []):
+            subtotal = item.get("subtotal", 0)
+            cantidad = item.get("cantidad_vendida", 0)
+            nombre = item.get("producto_nombre", "Desconocido")
+            pid = item.get("producto_id", "")
+            costo = cost_map.get(pid)
+
+            daily[day_key]["ingresos"] += subtotal
+            total_ingresos += subtotal
+            items_total += 1
+
+            product_stats[nombre]["ingresos"] += subtotal
+            product_stats[nombre]["cantidad"] += cantidad
+
+            if costo is not None:
+                costo_item = costo * cantidad
+                daily[day_key]["costos"] += costo_item
+                total_costos += costo_item
+                product_stats[nombre]["costos"] += costo_item
+                product_stats[nombre]["tiene_costo"] = True
+                items_con_costo += 1
+            else:
+                daily[day_key]["items_sin_costo"] += 1
+
+    # Build daily series filling gaps
+    daily_series = []
+    current = start_date
+    while current <= end_date:
+        key = current.strftime("%Y-%m-%d")
+        d = daily.get(key, {"ingresos": 0.0, "costos": 0.0, "items_sin_costo": 0})
+        daily_series.append({
+            "date": key,
+            "label": current.strftime("%d %b"),
+            "ingresos": round(d["ingresos"], 2),
+            "costos": round(d["costos"], 2),
+            "ganancia": round(d["ingresos"] - d["costos"], 2),
+        })
+        current += timedelta(days=1)
+
+    # Top profitable products (only those with cost defined)
+    top_rentables = sorted(
+        [
+            {
+                "nombre": name,
+                "ingresos": round(s["ingresos"], 2),
+                "costos": round(s["costos"], 2),
+                "ganancia": round(s["ingresos"] - s["costos"], 2),
+                "cantidad": s["cantidad"],
+                "margen": round(((s["ingresos"] - s["costos"]) / s["ingresos"]) * 100, 1)
+                if s["ingresos"] > 0 else 0,
+            }
+            for name, s in product_stats.items()
+            if s["tiene_costo"] and s["ingresos"] > 0
+        ],
+        key=lambda x: x["ganancia"],
+        reverse=True
+    )[:8]
+
+    ganancia_bruta = total_ingresos - total_costos
+    margen_promedio = round((ganancia_bruta / total_ingresos) * 100, 1) if total_ingresos > 0 else 0
+    cobertura_costo = round((items_con_costo / items_total) * 100) if items_total > 0 else 0
+
+    return {
+        "summary": {
+            "total_ingresos": round(total_ingresos, 2),
+            "total_costos": round(total_costos, 2),
+            "ganancia_bruta": round(ganancia_bruta, 2),
+            "margen_promedio": margen_promedio,
+            "cobertura_costo": cobertura_costo,  # % of items that have cost defined
+        },
+        "daily_series": daily_series,
+        "top_rentables": top_rentables,
         "period": {
             "start": start_date.strftime("%Y-%m-%d"),
             "end": end_date.strftime("%Y-%m-%d"),
