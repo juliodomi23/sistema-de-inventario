@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,8 +10,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { History, XCircle, Eye, CheckCircle, AlertTriangle, Filter, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function SalesHistory() {
   const [sales, setSales] = useState([]);
@@ -41,9 +39,7 @@ export default function SalesHistory() {
         if (statusFilter !== 'todas') params.append('status', statusFilter);
       }
       
-      const response = await axios.get(`${API_URL}/api/reports/sales?${params.toString()}`, {
-        withCredentials: true
-      });
+      const response = await api.get(`/api/reports/sales?${params.toString()}`);
       setSales(response.data.sales);
       setSummary(response.data.summary);
     } catch (error) {
@@ -70,9 +66,7 @@ export default function SalesHistory() {
     
     setIsCanceling(true);
     try {
-      await axios.post(`${API_URL}/api/sales/${saleToCancel.id}/cancel`, {}, {
-        withCredentials: true
-      });
+      await api.post(`/api/sales/${saleToCancel.id}/cancel`, {});
       toast.success('Venta anulada exitosamente. Stock restaurado.');
       fetchSales();
     } catch (error) {

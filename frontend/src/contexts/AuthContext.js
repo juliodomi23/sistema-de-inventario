@@ -23,6 +23,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     checkAuth();
+
+    const handleUnauthorized = () => setUser(false);
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
   const checkAuth = async () => {
@@ -32,7 +36,18 @@ export function AuthProvider({ children }) {
       });
       setUser(response.data);
     } catch (error) {
-      setUser(false);
+      if (error.response?.status === 401) {
+        // Access token expirado — intentar con el refresh token
+        try {
+          await axios.post(`${API_URL}/api/auth/refresh`, {}, { withCredentials: true });
+          const retryResponse = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true });
+          setUser(retryResponse.data);
+        } catch {
+          setUser(false);
+        }
+      } else {
+        setUser(false);
+      }
     } finally {
       setLoading(false);
     }

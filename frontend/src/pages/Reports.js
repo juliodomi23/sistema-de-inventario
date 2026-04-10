@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { FileText, Download, TrendingUp, ShoppingBag, CreditCard, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const COLORS = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444'];
 
@@ -46,9 +44,7 @@ export default function Reports() {
 
   const fetchStatistics = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/reports/statistics?days=${days}`, {
-        withCredentials: true
-      });
+      const response = await api.get(`/api/reports/statistics?days=${days}`);
       setStatistics(response.data);
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -66,12 +62,9 @@ export default function Reports() {
       if (endDate) params.append('end_date', endDate);
       if (statusFilter !== 'todas') params.append('status', statusFilter);
 
-      const response = await axios.get(
-        `${API_URL}/api/reports/sales/export/${format}?${params.toString()}`,
-        {
-          withCredentials: true,
-          responseType: 'blob'
-        }
+      const response = await api.get(
+        `/api/reports/sales/export/${format}?${params.toString()}`,
+        { responseType: 'blob' }
       );
 
       const url = window.URL.createObjectURL(new Blob([response.data]));

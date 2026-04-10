@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,8 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Plus, Pencil, Trash2, Package, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const UNIT_OPTIONS = [
   { value: 'kg', label: 'Kilogramos (kg)' },
@@ -52,9 +49,7 @@ export default function Products() {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/products`, {
-        withCredentials: true
-      });
+      const response = await api.get('/api/products');
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -148,14 +143,10 @@ export default function Products() {
 
     try {
       if (editingId) {
-        await axios.put(`${API_URL}/api/products/${editingId}`, payload, {
-          withCredentials: true
-        });
+        await api.put(`/api/products/${editingId}`, payload);
         toast.success('Producto actualizado');
       } else {
-        await axios.post(`${API_URL}/api/products`, payload, {
-          withCredentials: true
-        });
+        await api.post('/api/products', payload);
         toast.success('Producto creado');
       }
       fetchProducts();
@@ -171,9 +162,7 @@ export default function Products() {
   const handleDelete = async () => {
     if (!productToDelete) return;
     try {
-      await axios.delete(`${API_URL}/api/products/${productToDelete.id}`, {
-        withCredentials: true
-      });
+      await api.delete(`/api/products/${productToDelete.id}`);
       toast.success('Producto eliminado');
       fetchProducts();
     } catch (error) {

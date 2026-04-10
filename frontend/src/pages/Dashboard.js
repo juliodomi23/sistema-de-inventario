@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Package, ShoppingCart, AlertTriangle, CheckCircle, XCircle, DollarSign } from 'lucide-react';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function Dashboard() {
   const [summary, setSummary] = useState(null);
@@ -15,9 +13,7 @@ export default function Dashboard() {
 
   const fetchSummary = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/dashboard/summary`, {
-        withCredentials: true
-      });
+      const response = await api.get('/api/dashboard/summary');
       setSummary(response.data);
     } catch (error) {
       console.error('Error fetching summary:', error);

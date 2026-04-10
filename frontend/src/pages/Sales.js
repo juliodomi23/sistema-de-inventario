@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,8 +13,6 @@ import {
   Scan, ChevronDown, ChevronUp, Clock, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const PAYMENT_METHODS = [
   { value: 'efectivo', label: 'Efectivo', icon: Banknote },
@@ -68,9 +65,7 @@ export default function Sales() {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/products`, {
-        withCredentials: true
-      });
+      const response = await api.get('/api/products');
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -361,9 +356,7 @@ export default function Sales() {
         descuento_valor: descuentoTipo && descuentoValor ? parseFloat(descuentoValor) : null,
       };
 
-      const response = await axios.post(`${API_URL}/api/sales`, payload, {
-        withCredentials: true
-      });
+      const response = await api.post('/api/sales', payload);
 
       const saleData = response.data;
       saleData.clienteRef = selectedCustomer;
