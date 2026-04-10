@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"import ast; ast.parse\\(open\\('backend/server.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(New-Item -ItemType Directory -Force -Path \"D:\\\\AmbarRojo\\\\Sistema de inventario y pos\\\\sistema-de-inventario\\\\backend\\\\uploads\\\\products\")",
+      "Bash(Out-Null)"
     ]
   }
 }
