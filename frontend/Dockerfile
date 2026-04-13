@@ -7,7 +7,7 @@ WORKDIR /app
 ARG REACT_APP_BACKEND_URL=
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
 
-ARG CACHEBUST=1
+ARG CACHEBUST=2
 
 COPY package*.json yarn.lock* ./
 RUN npm install --legacy-peer-deps && npm install ajv@^8 --legacy-peer-deps
