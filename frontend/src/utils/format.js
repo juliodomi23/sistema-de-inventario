@@ -3,7 +3,8 @@ export const formatCurrency = (amount) =>
 
 export const formatDate = (dateString) => {
   if (!dateString) return '-';
-  return new Date(dateString).toLocaleString('es-MX', {
+  const normalized = /Z|[+-]\d{2}:?\d{2}$/.test(dateString) ? dateString : dateString + 'Z';
+  return new Date(normalized).toLocaleString('es-MX', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

@@ -9,11 +9,13 @@ import {
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
 
-const formatDate = (dateString) =>
-  new Date(dateString).toLocaleString('es-MX', {
+const formatDate = (dateString) => {
+  const normalized = /Z|[+-]\d{2}:?\d{2}$/.test(dateString) ? dateString : dateString + 'Z';
+  return new Date(normalized).toLocaleString('es-MX', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
     timeZone: 'America/Mexico_City',
   });
+};
 
 function KpiCard({ label, value, icon: Icon, iconBg, iconColor, badge, note }) {
   return (
