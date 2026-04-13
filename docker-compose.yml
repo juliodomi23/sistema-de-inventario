@@ -20,6 +20,7 @@ services:
       - VENDEDOR_PASSWORD=${VENDEDOR_PASSWORD}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - ENVIRONMENT=production
+      - TZ=America/Mexico_City
     depends_on:
       - mongo
     networks:

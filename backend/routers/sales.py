@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+MEXICO_TZ = ZoneInfo("America/Mexico_City")
 
 from database import db
 from dependencies import require_admin, require_seller_or_admin, parse_object_id
@@ -172,7 +175,8 @@ async def list_sales(limit: int = 50, user: dict = Depends(require_admin)):
 
 @router.get("/today-summary")
 async def get_today_summary(user: dict = Depends(require_admin)):
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    now_mx = datetime.now(MEXICO_TZ)
+    today_start = now_mx.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     today_end = today_start + timedelta(days=1)
 
     pipeline = [

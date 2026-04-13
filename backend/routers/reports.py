@@ -4,6 +4,9 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+MEXICO_TZ = ZoneInfo("America/Mexico_City")
 from collections import defaultdict
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -257,8 +260,9 @@ async def get_statistics(
 ):
     """Obtiene estadísticas de ventas para gráficas"""
 
-    end_date = datetime.now(timezone.utc).replace(hour=23, minute=59, second=59)
-    start_date = (end_date - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0)
+    now_mx = datetime.now(MEXICO_TZ)
+    end_date = now_mx.replace(hour=23, minute=59, second=59, microsecond=0).astimezone(timezone.utc)
+    start_date = (now_mx - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
     # Daily sales aggregation
     pipeline = [
@@ -369,8 +373,9 @@ async def get_profitability(
 ):
     """Reporte de rentabilidad: ingresos, costos estimados y ganancia bruta."""
 
-    end_date = datetime.now(timezone.utc).replace(hour=23, minute=59, second=59)
-    start_date = (end_date - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0)
+    now_mx = datetime.now(MEXICO_TZ)
+    end_date = now_mx.replace(hour=23, minute=59, second=59, microsecond=0).astimezone(timezone.utc)
+    start_date = (now_mx - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
     # Fetch sales in period
     sales = await db.sales.find({

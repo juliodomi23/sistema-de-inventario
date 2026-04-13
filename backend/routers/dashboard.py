@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+MEXICO_TZ = ZoneInfo("America/Mexico_City")
 from bson import ObjectId
 
 from database import db
@@ -23,9 +26,9 @@ async def get_dashboard_summary(user: dict = Depends(require_admin)):
     # Build a cost map for profit calculations
     cost_map = {str(p["_id"]): p.get("costo") for p in products}
 
-    # Today boundaries
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Today boundaries (Mexico City timezone)
+    now_mx = datetime.now(MEXICO_TZ)
+    today_start = now_mx.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     today_end = today_start + timedelta(days=1)
     yesterday_start = today_start - timedelta(days=1)
 
