@@ -11,7 +11,8 @@ const formatCurrency = (amount) =>
 
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleString('es-MX', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+    timeZone: 'America/Mexico_City',
   });
 
 function KpiCard({ label, value, icon: Icon, iconBg, iconColor, badge, note }) {

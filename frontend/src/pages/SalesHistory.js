@@ -90,7 +90,8 @@ export default function SalesHistory() {
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'America/Mexico_City',
     });
   };
 
