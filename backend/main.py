@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from database import db
 from dependencies import hash_password, verify_password
+from config import IS_PRODUCTION
 
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
@@ -87,10 +88,18 @@ async def startup_event():
     await db.cash_registers.create_index("fecha_apertura")
     await db.customers.create_index("nombre")
     await db.customer_payments.create_index("cliente_id")
+    # Compound index: covers dashboard + reports + historial queries (fecha_venta + estado)
+    await db.sales.create_index([("fecha_venta", -1), ("estado", 1)])
+    await db.sales.create_index("cliente_id")
+    # TTL index: auto-delete expired login attempt records
+    await db.login_attempts.create_index("lockout_until", expireAfterSeconds=0)
 
     # Seed admin user
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@inventario.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+
+    if IS_PRODUCTION and (not admin_password or admin_password == "admin123"):
+        raise RuntimeError("ADMIN_PASSWORD debe ser una contraseña segura en producción")
 
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:

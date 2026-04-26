@@ -1,4 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+function ProductThumb({ url, name }) {
+  const [err, setErr] = useState(false);
+  if (!url || err) return <Package className="h-6 w-6 text-zinc-400" />;
+  return (
+    <img
+      src={`${BACKEND_URL}${url}`}
+      alt={name}
+      className="w-full h-full object-cover"
+      onError={() => setErr(true)}
+    />
+  );
+}
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -36,7 +51,7 @@ export default function Sales() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState(null);
   const [error, setError] = useState('');
-  const [quantityModal, setQuantityModal] = useState({ open: false, product: null, quantity: 1 });
+  const [quantityModal, setQuantityModal] = useState({ open: false, product: null, quantity: 1, maxAvailable: 1 });
 
   // Descuento
   const [showDiscount, setShowDiscount] = useState(false);
@@ -264,11 +279,13 @@ export default function Sales() {
     setCart([]);
     setCashReceived('');
     setError('');
+    setPaymentMethod('efectivo');
     setDescuentoTipo(null);
     setDescuentoValor('');
     setShowDiscount(false);
     setSelectedCustomer(null);
     setCustomerSearch('');
+    setShowCustomerDropdown(false);
   };
 
   const getSubtotal = () => {
@@ -493,8 +510,8 @@ export default function Sales() {
                   )}
 
                   <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-2 bg-white rounded-lg flex items-center justify-center border border-zinc-200">
-                      <Package className="h-6 w-6 text-zinc-400" />
+                    <div className="w-12 h-12 mx-auto mb-2 bg-white rounded-lg flex items-center justify-center border border-zinc-200 overflow-hidden">
+                      <ProductThumb url={product.imagen_url} name={product.nombre} />
                     </div>
                     <p className="text-sm font-medium text-zinc-900 truncate" title={product.nombre}>
                       {product.nombre}

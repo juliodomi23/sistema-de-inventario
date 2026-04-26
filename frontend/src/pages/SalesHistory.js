@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import { formatCurrency, formatDate } from '../utils/format';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -68,32 +69,13 @@ export default function SalesHistory() {
     try {
       await api.post(`/api/sales/${saleToCancel.id}/cancel`, {});
       toast.success('Venta anulada exitosamente. Stock restaurado.');
-      fetchSales();
+      fetchSales(true);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al anular venta');
     } finally {
       setIsCanceling(false);
       setSaleToCancel(null);
     }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN'
-    }).format(amount);
-  };
-
-  const formatDate = (dateString) => {
-    const normalized = /Z|[+-]\d{2}:?\d{2}$/.test(dateString) ? dateString : dateString + 'Z';
-    return new Date(normalized).toLocaleString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'America/Mexico_City',
-    });
   };
 
   const getStatusBadge = (estado) => {

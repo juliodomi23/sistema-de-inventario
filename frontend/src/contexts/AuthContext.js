@@ -1,12 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../lib/api';
 
 const AuthContext = createContext(null);
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
-
-// Configure axios defaults
-axios.defaults.withCredentials = true;
 
 export function formatApiErrorDetail(detail) {
   if (detail == null) return "Algo salió mal. Intente de nuevo.";
@@ -31,23 +26,10 @@ export function AuthProvider({ children }) {
 
   const checkAuth = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/auth/me`, {
-        withCredentials: true
-      });
+      const response = await api.get('/api/auth/me');
       setUser(response.data);
-    } catch (error) {
-      if (error.response?.status === 401) {
-        // Access token expirado — intentar con el refresh token
-        try {
-          await axios.post(`${API_URL}/api/auth/refresh`, {}, { withCredentials: true });
-          const retryResponse = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true });
-          setUser(retryResponse.data);
-        } catch {
-          setUser(false);
-        }
-      } else {
-        setUser(false);
-      }
+    } catch {
+      setUser(false);
     } finally {
       setLoading(false);
     }
@@ -55,24 +37,20 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post(
-        `${API_URL}/api/auth/login`,
-        { email, password },
-        { withCredentials: true }
-      );
+      const response = await api.post('/api/auth/login', { email, password });
       setUser(response.data);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: formatApiErrorDetail(error.response?.data?.detail) || error.message 
+      return {
+        success: false,
+        error: formatApiErrorDetail(error.response?.data?.detail) || error.message
       };
     }
   };
 
   const logout = async () => {
     try {
-      await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
+      await api.post('/api/auth/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

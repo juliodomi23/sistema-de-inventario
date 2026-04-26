@@ -264,7 +264,7 @@ async def get_statistics(
     end_date = now_mx.replace(hour=23, minute=59, second=59, microsecond=0).astimezone(timezone.utc)
     start_date = (now_mx - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
-    # Daily sales aggregation
+    # Daily sales aggregation — group by Mexico City date to avoid UTC day-shift
     pipeline = [
         {
             "$match": {
@@ -275,18 +275,21 @@ async def get_statistics(
         {
             "$group": {
                 "_id": {
-                    "year": {"$year": "$fecha_venta"},
-                    "month": {"$month": "$fecha_venta"},
-                    "day": {"$dayOfMonth": "$fecha_venta"}
+                    "$dateToString": {
+                        "format": "%Y-%m-%d",
+                        "date": "$fecha_venta",
+                        "timezone": "America/Mexico_City"
+                    }
                 },
                 "total": {"$sum": "$monto_total"},
                 "count": {"$sum": 1}
             }
         },
-        {"$sort": {"_id.year": 1, "_id.month": 1, "_id.day": 1}}
+        {"$sort": {"_id": 1}}
     ]
 
     daily_sales = await db.sales.aggregate(pipeline).to_list(100)
+    sales_by_date = {d["_id"]: d for d in daily_sales}
 
     # Payment method breakdown
     payment_pipeline = [
@@ -329,24 +332,20 @@ async def get_statistics(
 
     top_products = await db.sales.aggregate(top_products_pipeline).to_list(5)
 
-    # Format daily data for chart
+    # Format daily data for chart — iterate Mexico City dates
+    current_mx = (now_mx - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    end_mx = now_mx.replace(hour=23, minute=59, second=59, microsecond=0)
     daily_data = []
-    current = start_date
-    while current <= end_date:
-        day_data = next(
-            (d for d in daily_sales if
-             d["_id"]["year"] == current.year and
-             d["_id"]["month"] == current.month and
-             d["_id"]["day"] == current.day),
-            None
-        )
+    while current_mx <= end_mx:
+        date_key = current_mx.strftime("%Y-%m-%d")
+        day_data = sales_by_date.get(date_key)
         daily_data.append({
-            "date": current.strftime("%Y-%m-%d"),
-            "label": current.strftime("%d %b"),
+            "date": date_key,
+            "label": current_mx.strftime("%d %b"),
             "total": day_data["total"] if day_data else 0,
             "count": day_data["count"] if day_data else 0
         })
-        current += timedelta(days=1)
+        current_mx += timedelta(days=1)
 
     return {
         "daily_sales": daily_data,
@@ -359,8 +358,8 @@ async def get_statistics(
             for p in top_products
         ],
         "period": {
-            "start": start_date.strftime("%Y-%m-%d"),
-            "end": end_date.strftime("%Y-%m-%d"),
+            "start": (now_mx - timedelta(days=days - 1)).strftime("%Y-%m-%d"),
+            "end": now_mx.strftime("%Y-%m-%d"),
             "days": days
         }
     }
@@ -397,7 +396,7 @@ async def get_profitability(
     items_total = 0
 
     for sale in sales:
-        day_key = sale["fecha_venta"].strftime("%Y-%m-%d")
+        day_key = sale["fecha_venta"].astimezone(MEXICO_TZ).strftime("%Y-%m-%d")
         for item in sale.get("items", []):
             subtotal = item.get("subtotal", 0)
             cantidad = item.get("cantidad_vendida", 0)
@@ -422,20 +421,21 @@ async def get_profitability(
             else:
                 daily[day_key]["items_sin_costo"] += 1
 
-    # Build daily series filling gaps
+    # Build daily series filling gaps — iterate Mexico City dates
+    current_mx = (now_mx - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    end_mx = now_mx.replace(hour=23, minute=59, second=59, microsecond=0)
     daily_series = []
-    current = start_date
-    while current <= end_date:
-        key = current.strftime("%Y-%m-%d")
+    while current_mx <= end_mx:
+        key = current_mx.strftime("%Y-%m-%d")
         d = daily.get(key, {"ingresos": 0.0, "costos": 0.0, "items_sin_costo": 0})
         daily_series.append({
             "date": key,
-            "label": current.strftime("%d %b"),
+            "label": current_mx.strftime("%d %b"),
             "ingresos": round(d["ingresos"], 2),
             "costos": round(d["costos"], 2),
             "ganancia": round(d["ingresos"] - d["costos"], 2),
         })
-        current += timedelta(days=1)
+        current_mx += timedelta(days=1)
 
     # Top profitable products (only those with cost defined)
     top_rentables = sorted(
@@ -471,8 +471,8 @@ async def get_profitability(
         "daily_series": daily_series,
         "top_rentables": top_rentables,
         "period": {
-            "start": start_date.strftime("%Y-%m-%d"),
-            "end": end_date.strftime("%Y-%m-%d"),
+            "start": (now_mx - timedelta(days=days - 1)).strftime("%Y-%m-%d"),
+            "end": now_mx.strftime("%Y-%m-%d"),
             "days": days
         }
     }

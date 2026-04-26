@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Toaster } from './components/ui/sonner';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -65,8 +66,16 @@ function PublicRoute({ children }) {
 }
 
 function DefaultRedirect() {
-  const { user } = useAuth();
-  
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <div className="text-zinc-500">Cargando...</div>
+      </div>
+    );
+  }
+
   if (user?.role === 'vendedor') {
     return <Navigate to="/ventas" replace />;
   }
@@ -145,7 +154,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
         <Toaster position="top-right" />
       </AuthProvider>
     </BrowserRouter>

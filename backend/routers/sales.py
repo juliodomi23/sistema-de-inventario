@@ -205,38 +205,41 @@ async def cancel_sale(sale_id: str, user: dict = Depends(require_admin)):
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
 
-    if sale.get("estado") == "anulada":
+    # Marcar como anulada atómicamente — si ya estaba anulada, matched_count será 0
+    result = await db.sales.update_one(
+        {"_id": parse_object_id(sale_id), "estado": {"$ne": "anulada"}},
+        {"$set": {
+            "estado": "anulada",
+            "fecha_anulacion": datetime.now(timezone.utc),
+            "anulada_por": user["id"]
+        }}
+    )
+    if result.matched_count == 0:
         raise HTTPException(status_code=400, detail="Esta venta ya fue anulada")
 
-    # Restore stock for each item
+    # Restaurar stock con $inc (atómico, sin race condition)
     for item in sale.get("items", []):
-        product = await db.products.find_one({"_id": parse_object_id(item["producto_id"])})
-        if product:
-            new_stock = product["cantidad_stock"] + item["cantidad_vendida"]
-            await db.products.update_one(
-                {"_id": parse_object_id(item["producto_id"])},
-                {"$set": {"cantidad_stock": new_stock}}
-            )
+        await db.products.update_one(
+            {"_id": parse_object_id(item["producto_id"])},
+            {"$inc": {"cantidad_stock": item["cantidad_vendida"]}}
+        )
+        updated = await db.products.find_one({"_id": parse_object_id(item["producto_id"])})
+        if updated:
             await db.stock_logs.insert_one({
                 "producto_id": item["producto_id"],
-                "cantidad_anterior": product["cantidad_stock"],
-                "cantidad_nueva": new_stock,
+                "cantidad_anterior": updated["cantidad_stock"] - item["cantidad_vendida"],
+                "cantidad_nueva": updated["cantidad_stock"],
                 "tipo": "anulacion_venta",
                 "venta_id": sale_id,
                 "fecha": datetime.now(timezone.utc)
             })
 
-    # Update sale status
-    await db.sales.update_one(
-        {"_id": parse_object_id(sale_id)},
-        {
-            "$set": {
-                "estado": "anulada",
-                "fecha_anulacion": datetime.now(timezone.utc),
-                "anulada_por": user["id"]
-            }
-        }
-    )
+    # Revertir saldo de cliente si era fiado
+    if sale.get("metodo_pago") == "fiado" and sale.get("cliente_id"):
+        await db.customers.update_one(
+            {"_id": parse_object_id(sale["cliente_id"])},
+            {"$inc": {"saldo_pendiente": -sale["monto_total"]}}
+        )
 
     return {
         "message": "Venta anulada exitosamente",

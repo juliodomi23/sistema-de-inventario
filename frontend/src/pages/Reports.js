@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -11,14 +11,12 @@ import {
 } from 'recharts';
 import { FileText, Download, TrendingUp, ShoppingBag, CreditCard, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency, formatCurrencyCompact } from '../utils/format';
 
 const COLORS = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444'];
 
-const fmtCurrency = (v) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 }).format(v);
-
-const fmtCurrencyFull = (v) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v);
+const fmtCurrency = formatCurrencyCompact;
+const fmtCurrencyFull = formatCurrency;
 
 function SalesTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -62,17 +60,23 @@ export default function Reports() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
+    const ctrl = new AbortController();
     setLoading(true);
     Promise.all([
-      api.get(`/api/reports/statistics?days=${days}`),
-      api.get(`/api/reports/profitability?days=${days}`),
+      api.get(`/api/reports/statistics?days=${days}`, { signal: ctrl.signal }),
+      api.get(`/api/reports/profitability?days=${days}`, { signal: ctrl.signal }),
     ])
       .then(([statsRes, profitRes]) => {
         setStatistics(statsRes.data);
         setProfitability(profitRes.data);
       })
-      .catch(() => toast.error('Error al cargar estadísticas'))
+      .catch(err => {
+        if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
+          toast.error('Error al cargar estadísticas');
+        }
+      })
       .finally(() => setLoading(false));
+    return () => ctrl.abort();
   }, [days]);
 
   const exportReport = async (format) => {

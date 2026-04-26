@@ -8,6 +8,7 @@ if (!API_URL) {
 export const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
+  timeout: 15000,
 });
 
 let isRefreshing = false;

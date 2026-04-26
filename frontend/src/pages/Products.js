@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Plus, Pencil, Trash2, Package, AlertCircle, ImagePlus, X, TrendingUp, Camera, Images } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '../utils/format';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -33,9 +34,6 @@ const initialFormState = {
   codigo_barras: '',
   categoria_id: '',
 };
-
-const formatCurrency = (amount) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
 
 function getMargen(costo, precio) {
   if (!costo || !precio || precio <= 0) return null;

@@ -1,21 +1,10 @@
-import { useState, useEffect } from 'react';
-import { api } from '../lib/api';
+import { formatCurrency, formatDate } from '../utils/format';
+import { useFetch } from '../hooks/useFetch';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import {
   Package, ShoppingCart, AlertTriangle, CheckCircle,
   XCircle, DollarSign, TrendingUp, TrendingDown, Warehouse, Info
 } from 'lucide-react';
-
-const formatCurrency = (amount) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
-
-const formatDate = (dateString) => {
-  const normalized = /Z|[+-]\d{2}:?\d{2}$/.test(dateString) ? dateString : dateString + 'Z';
-  return new Date(normalized).toLocaleString('es-MX', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-    timeZone: 'America/Mexico_City',
-  });
-};
 
 function KpiCard({ label, value, icon: Icon, iconBg, iconColor, badge, note }) {
   return (
@@ -57,15 +46,7 @@ function ChangeBadge({ pct }) {
 }
 
 export default function Dashboard() {
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.get('/api/dashboard/summary')
-      .then(r => setSummary(r.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: summary, loading } = useFetch('/api/dashboard/summary');
 
   if (loading) {
     return (
